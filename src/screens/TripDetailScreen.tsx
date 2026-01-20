@@ -13,12 +13,21 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
-import { User, Mountain, Map, Copy, Heart, MessageCircle } from "lucide-react-native";
+import { User, Mountain, Map, Copy, Heart, MessageCircle, Pencil } from "lucide-react-native";
 import styles from "./TripDetailScreen.styles";
+import { useTrips } from "../store/tripsContext";
+import MapView, { Marker, PROVIDER_DEFAULT, Region } from "react-native-maps";
 
 type Props = NativeStackScreenProps<RootStackParamList, "TripDetail">;
 
-export default function TripDetailScreen({ navigation }: Props) {
+export default function TripDetailScreen({ navigation, route }: Props) {
+  const { trips } = useTrips();
+  const tripId = route.params?.tripId;
+  const source = route.params?.source;
+  const trip = tripId ? trips.find((item) => item.id === tripId) : undefined;
+  const markers = trip?.stops?.filter(
+    (stop) => stop.latitude != null && stop.longitude != null
+  );
   const scrollY = useRef(new Animated.Value(0)).current;
   const lastScrollY = useRef(0);
   const [tabBarVisible, setTabBarVisible] = useState(true);
@@ -38,6 +47,32 @@ export default function TripDetailScreen({ navigation }: Props) {
     }
     return "default";
   };
+
+  const tripTitle = trip?.title ?? "Trip to Tokyo 5 days";
+  const tripBudget = trip?.budget ?? "600$avg";
+  const tripPoints = trip?.stops?.length
+    ? `${trip.stops.length} points`
+    : "5 points";
+  const tripDuration = trip?.duration ?? "October 3 days";
+  const tripTags = trip?.tags?.length ? trip.tags : ["Cultural", "Adventure", "Food Tour", "City"];
+  const tripDescription =
+    trip?.destination
+      ? `Trip through ${trip.destination}, combining local culture, food, and hidden spots tailored to your route.`
+      : "En este viaje pasamos por Tokio, recorriendo barrios como Shibuya Crossing y Asakusa, combinando modernidad y tradición visitamos templos, parques y mercados locales, y dedicamos un día a una excursión a Monte Fuji para disfrutar del paisaje.";
+
+  const mapRegion: Region = markers && markers.length > 0
+    ? {
+        latitude: markers[0].latitude as number,
+        longitude: markers[0].longitude as number,
+        latitudeDelta: 0.08,
+        longitudeDelta: 0.08,
+      }
+    : {
+        latitude: 35.6762,
+        longitude: 139.6503,
+        latitudeDelta: 0.2,
+        longitudeDelta: 0.2,
+      };
 
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -116,7 +151,7 @@ export default function TripDetailScreen({ navigation }: Props) {
         </View>
 
         <View style={styles.tagsContainer}>
-          {["Cultural", "Adventure", "Food Tour", "City"].map((tag) => {
+          {tripTags.map((tag) => {
             const variant = getTagVariant(tag);
             return (
               <View
@@ -142,55 +177,85 @@ export default function TripDetailScreen({ navigation }: Props) {
           })}
         </View>
 
-        <Text style={styles.tripTitle}>Trip to Tokyo 5 days</Text>
+        <Text style={styles.tripTitle}>{tripTitle}</Text>
         
         <View style={styles.statsRow}>
-          <Text style={styles.statText}>600$avg</Text>
+          <Text style={styles.statText}>{tripBudget}</Text>
           <View style={styles.statDivider} />
-          <Text style={styles.statText}>5 points</Text>
+          <Text style={styles.statText}>{tripPoints}</Text>
           <View style={styles.statDivider} />
-          <Text style={styles.statText}>October 3 days</Text>
+          <Text style={styles.statText}>{tripDuration}</Text>
         </View>
 
         <View style={styles.divider} />
 
         <View style={styles.descriptionContainer}>
-          <Text style={styles.descriptionText}>
-            En este viaje pasamos por Tokio, recorriendo barrios como Shibuya Crossing y Asakusa, combinando modernidad y tradición visitamos templos, parques y mercados locales, y dedicamos un día a una excursión a Monte Fuji para disfrutar del paisaje.
-          </Text>
+          <Text style={styles.descriptionText}>{tripDescription}</Text>
         </View>
 
-        <View style={styles.mapContainer}>
+        <Pressable
+          style={styles.mapContainer}
+          onPress={() => navigation.navigate("TripMap", { tripId })}
+        >
           <View style={styles.mapPlaceholder}>
-            <Map size={32} color="#6B7280" />
-            <Text style={styles.mapSubtext}>Tokyo, Japan</Text>
+            <MapView
+              style={{ flex: 1 }}
+              provider={PROVIDER_DEFAULT}
+              pointerEvents="none"
+              initialRegion={mapRegion}
+            >
+              {markers?.map((stop) => (
+                <Marker
+                  key={stop.id}
+                  coordinate={{
+                    latitude: stop.latitude as number,
+                    longitude: stop.longitude as number,
+                  }}
+                  title={stop.title}
+                  description={stop.address}
+                />
+              ))}
+            </MapView>
           </View>
-        </View>
+        </Pressable>
 
         <View style={styles.divider} />
 
         <Text style={styles.sectionTitle}>Itinerary</Text>
         
-        <View style={styles.itineraryItem}>
-          <View style={styles.dayBadge}>
-            <Text style={styles.dayText}>Day 1</Text>
-          </View>
-          <Text style={styles.itineraryText}>Llegada a Tokyo - Shibuya</Text>
-        </View>
-        
-        <View style={styles.itineraryItem}>
-          <View style={styles.dayBadge}>
-            <Text style={styles.dayText}>Day 2</Text>
-          </View>
-          <Text style={styles.itineraryText}>Asakusa - Senso-ji Temple</Text>
-        </View>
-        
-        <View style={styles.itineraryItem}>
-          <View style={styles.dayBadge}>
-            <Text style={styles.dayText}>Day 3</Text>
-          </View>
-          <Text style={styles.itineraryText}>Excursión Monte Fuji</Text>
-        </View>
+        {trip?.stops?.length ? (
+          trip.stops.map((stop, index) => (
+            <View key={stop.id} style={styles.itineraryItem}>
+              <View style={styles.dayBadge}>
+                <Text style={styles.dayText}>Stop {index + 1}</Text>
+              </View>
+              <Text style={styles.itineraryText}>{stop.title}</Text>
+            </View>
+          ))
+        ) : (
+          <>
+            <View style={styles.itineraryItem}>
+              <View style={styles.dayBadge}>
+                <Text style={styles.dayText}>Day 1</Text>
+              </View>
+              <Text style={styles.itineraryText}>Llegada a Tokyo - Shibuya</Text>
+            </View>
+            
+            <View style={styles.itineraryItem}>
+              <View style={styles.dayBadge}>
+                <Text style={styles.dayText}>Day 2</Text>
+              </View>
+              <Text style={styles.itineraryText}>Asakusa - Senso-ji Temple</Text>
+            </View>
+            
+            <View style={styles.itineraryItem}>
+              <View style={styles.dayBadge}>
+                <Text style={styles.dayText}>Day 3</Text>
+              </View>
+              <Text style={styles.itineraryText}>Excursión Monte Fuji</Text>
+            </View>
+          </>
+        )}
 
         <View style={styles.bottomSpacer} />
       </Animated.ScrollView>
@@ -207,7 +272,11 @@ export default function TripDetailScreen({ navigation }: Props) {
         <Pressable onPress={() => console.log("Copy trip")} accessibilityRole="button">
           <View style={styles.actionItem}>
             <View style={[styles.actionButton, styles.actionCopy]}>
-              <Copy size={18} color="#1E1E1E" />
+              {source === "my" ? (
+                <Pencil size={18} color="#1E1E1E" />
+              ) : (
+                <Copy size={18} color="#1E1E1E" />
+              )}
             </View>
           </View>
         </Pressable>

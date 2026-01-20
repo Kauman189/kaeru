@@ -172,7 +172,7 @@ export default function HomeScreen({ onTabBarVisibilityChange }: HomeScreenProps
               key={trip.id}
               trip={trip}
               showAuthor={index === 0}
-              onPress={() => navigation.navigate("TripDetail")}
+              onPress={() => navigation.navigate("TripDetail", { source: "discover" })}
             />
           ))}
 

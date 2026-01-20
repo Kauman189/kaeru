@@ -9,14 +9,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import OnboardingScreen from "../screens/OnboardingScreen";
 import TabsPager from "../screens/TabsPager";
 import TripDetailScreen from "../screens/TripDetailScreen";
+import TripMapScreen from "../screens/TripMapScreen";
 import AuthScreen from "../screens/AuthScreen";
+import CreateTripScreen from "../screens/CreateTripScreen";
 import { getOnboardingSeen } from "../storage/onboardingStorage";
 import styles from "./RootNavigator.styles";
 
 export type RootStackParamList = {
   Onboarding: undefined;
   Tabs: undefined;
-  TripDetail: undefined;
+  CreateTrip: undefined;
+  TripDetail: { tripId?: string; source?: "my" | "discover" } | undefined;
+  TripMap: { tripId?: string } | undefined;
   Auth: undefined;
 };
 
@@ -64,10 +68,16 @@ export default function RootNavigator() {
       >
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="Tabs" component={TabsPager} />
+        <Stack.Screen name="CreateTrip" component={CreateTripScreen} />
         <Stack.Screen 
           name="TripDetail" 
           component={TripDetailScreen}
           options={{ presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="TripMap"
+          component={TripMapScreen}
+          options={{ presentation: "modal" }}
         />
         <Stack.Screen
           name="Auth"

@@ -79,7 +79,7 @@ export default function OnboardingScreen({ navigation }: Props) {
     // TODO: Tras autenticar, persistir onboarding y reiniciar a Home.
     // await setOnboardingSeen();
     // navigation.reset({ index: 0, routes: [{ name: "Tabs" }] });
-    navigation.navigate("Auth");
+    navigation.navigate("CreateTrip");
   }, [navigation]);
 
   const handleExplore = useCallback(async () => {
