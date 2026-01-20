@@ -12,6 +12,8 @@ import TripDetailScreen from "../screens/TripDetailScreen";
 import TripMapScreen from "../screens/TripMapScreen";
 import AuthScreen from "../screens/AuthScreen";
 import CreateTripScreen from "../screens/CreateTripScreen";
+import ProfileEditScreen from "../screens/ProfileEditScreen";
+import ProfileSetupScreen from "../screens/ProfileSetupScreen";
 import { getOnboardingSeen } from "../storage/onboardingStorage";
 import styles from "./RootNavigator.styles";
 
@@ -22,6 +24,8 @@ export type RootStackParamList = {
   TripDetail: { tripId?: string; source?: "my" | "discover" } | undefined;
   TripMap: { tripId?: string } | undefined;
   Auth: undefined;
+  ProfileEdit: undefined;
+  ProfileSetup: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -82,6 +86,16 @@ export default function RootNavigator() {
         <Stack.Screen
           name="Auth"
           component={AuthScreen}
+          options={{ presentation: "modal" }}
+        />
+        <Stack.Screen
+          name="ProfileEdit"
+          component={ProfileEditScreen}
+          options={{ presentation: "modal" }}
+        />
+        <Stack.Screen
+          name="ProfileSetup"
+          component={ProfileSetupScreen}
           options={{ presentation: "modal" }}
         />
       </Stack.Navigator>

@@ -3,7 +3,7 @@ import { StyleSheet } from "react-native";
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F7",
+    backgroundColor: "#FFFFFF",
   },
   safeArea: {
     flex: 1,
@@ -175,6 +175,36 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginTop: 4,
   },
+  visibilityRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 12,
+  },
+  visibilityOption: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 14,
+    backgroundColor: "#FFFFFF",
+  },
+  visibilityOptionActive: {
+    borderColor: "#1E1E1E",
+    backgroundColor: "#1E1E1E",
+  },
+  visibilityText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1E1E1E",
+    marginBottom: 4,
+  },
+  visibilityTextActive: {
+    color: "#FFFFFF",
+  },
+  visibilitySubtext: {
+    fontSize: 12,
+    color: "#6B7280",
+  },
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
@@ -304,7 +334,6 @@ const styles = StyleSheet.create({
   },
   footer: {
     position: "absolute",
-    height: 80,
     left: 0,
     right: 0,
     bottom: 0,
@@ -312,7 +341,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     borderTopWidth: 1,
     borderTopColor: "#E5E7EB",
-    backgroundColor: "#F5F5F7",
+    backgroundColor: "#FFFFFF",
     zIndex: 5,
   },
   footerScrim: {

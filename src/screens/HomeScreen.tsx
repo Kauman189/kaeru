@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   StatusBar,
@@ -14,6 +14,7 @@ import styles from "./HomeScreen.styles";
 import { RootStackParamList } from "../navigation/RootNavigator";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useProfile } from "../store/profileContext";
 
 const TRIPS: TripData[] = [
   {
@@ -58,6 +59,8 @@ type HomeScreenProps = {
 
 export default function HomeScreen({ onTabBarVisibilityChange }: HomeScreenProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { needsProfileSetup, profileComplete, setNeedsProfileSetup } = useProfile();
+  const [dismissedPrompt, setDismissedPrompt] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
   const lastScrollY = useRef(0);
   const barVisibleRef = useRef(true);
@@ -87,6 +90,12 @@ export default function HomeScreen({ onTabBarVisibilityChange }: HomeScreenProps
   useEffect(() => {
     onTabBarVisibilityChange?.(true);
   }, [onTabBarVisibilityChange]);
+
+  useEffect(() => {
+    if (needsProfileSetup && !profileComplete) {
+      setDismissedPrompt(false);
+    }
+  }, [needsProfileSetup, profileComplete]);
 
   const getFilterVariant = (filter: string) => {
     const lower = filter.toLowerCase();
@@ -189,6 +198,35 @@ export default function HomeScreen({ onTabBarVisibilityChange }: HomeScreenProps
         <View style={[styles.gradientLayer, { opacity: 1 }]} />
       </View>
 
+      {needsProfileSetup && !profileComplete && !dismissedPrompt && (
+        <View style={styles.profilePromptOverlay}>
+          <View style={styles.profilePromptCard}>
+            <Text style={styles.profilePromptTitle}>Completa tu perfil</Text>
+            <Text style={styles.profilePromptText}>
+              Ayuda a personalizar tus viajes y a encontrarte con otros viajeros.
+            </Text>
+            <View style={styles.profilePromptActions}>
+              <TouchableOpacity
+                style={styles.profilePromptSecondary}
+                onPress={() => {
+                  setDismissedPrompt(true);
+                  setNeedsProfileSetup(true);
+                }}
+                accessibilityRole="button"
+              >
+                <Text style={styles.profilePromptSecondaryText}>Mas tarde</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.profilePromptPrimary}
+                onPress={() => navigation.navigate("ProfileSetup")}
+                accessibilityRole="button"
+              >
+                <Text style={styles.profilePromptPrimaryText}>Completar ahora</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }

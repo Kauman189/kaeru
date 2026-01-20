@@ -2,17 +2,31 @@
  * Pantalla de acceso tras el CTA principal del onboarding.
  * UI de MVP preparada para integracion con backend.
  */
-import React from "react";
+import React, { useState } from "react";
 import { Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ArrowLeft } from "lucide-react-native";
 import { RootStackParamList } from "../navigation/RootNavigator";
+import { useProfile } from "../store/profileContext";
 import styles from "./AuthScreen.styles";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Auth">;
 
 export default function AuthScreen({ navigation }: Props) {
+  const { setNeedsProfileSetup, updateProfile } = useProfile();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleContinue = () => {
+    updateProfile({ email, password });
+    setNeedsProfileSetup(true);
+    navigation.reset({
+      index: 0,
+      routes: [{ name: "Tabs" }],
+    });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -39,6 +53,8 @@ export default function AuthScreen({ navigation }: Props) {
             placeholderTextColor="#9CA3AF"
             keyboardType="email-address"
             autoCapitalize="none"
+            value={email}
+            onChangeText={setEmail}
           />
         </View>
 
@@ -49,10 +65,16 @@ export default function AuthScreen({ navigation }: Props) {
             placeholder="••••••••"
             placeholderTextColor="#9CA3AF"
             secureTextEntry
+            value={password}
+            onChangeText={setPassword}
           />
         </View>
 
-        <TouchableOpacity style={styles.primaryButton} accessibilityRole="button">
+        <TouchableOpacity
+          style={styles.primaryButton}
+          accessibilityRole="button"
+          onPress={handleContinue}
+        >
           <Text style={styles.primaryButtonText}>Continuar</Text>
         </TouchableOpacity>
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   StatusBar,
@@ -8,13 +8,14 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Mic, Plus, SlidersHorizontal, User } from "lucide-react-native";
+import { Mic, Plus, SlidersHorizontal, Share2, Send } from "lucide-react-native";
 import styles from "./MyTripsScreen.styles";
 import TripCard, { TripData } from "../components/TripCard";
 import { useTrips } from "../store/tripsContext";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
+import { MOCK_USERS } from "../mock/users";
 
 type MyTripsScreenProps = {
   onTabBarVisibilityChange?: (visible: boolean) => void;
@@ -22,10 +23,14 @@ type MyTripsScreenProps = {
 
 export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScreenProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { trips } = useTrips();
+  const { trips, addCollaborator, removeCollaborator } = useTrips();
+  const [inviteVisible, setInviteVisible] = useState(false);
+  const [invitedIds, setInvitedIds] = useState<string[]>([]);
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
   const lastScrollY = useRef(0);
   const barVisibleRef = useRef(true);
+  const mockUsers = MOCK_USERS;
 
   const tripCards = useMemo<TripData[]>(() => {
     return trips.map((trip) => ({
@@ -63,6 +68,12 @@ export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScree
     onTabBarVisibilityChange?.(true);
   }, [onTabBarVisibilityChange]);
 
+  useEffect(() => {
+    if (!selectedTripId && trips.length > 0) {
+      setSelectedTripId(trips[0].id);
+    }
+  }, [selectedTripId, trips]);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -78,9 +89,13 @@ export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScree
               <Text style={styles.title}>Let's plan your</Text>
               <Text style={styles.title}>next trip</Text>
             </View>
-            <View style={styles.avatarContainer}>
-              <User size={28} color="#4B5563" />
-            </View>
+            <TouchableOpacity
+              style={styles.inviteButton}
+              onPress={() => setInviteVisible(true)}
+              accessibilityRole="button"
+            >
+              <Share2 size={22} color="#1E1E1E" />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.searchContainer}>
@@ -128,9 +143,122 @@ export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScree
         accessibilityRole="button"
         onPress={() => navigation.navigate("CreateTrip")}
       >
-        <Plus size={28} color="#1E1E1E" />
+        <Plus size={28} color="#fcfcfc" />
       </TouchableOpacity>
 
+      {inviteVisible && (
+        <View style={styles.inviteOverlay}>
+          <View style={styles.inviteCard}>
+            <Text style={styles.inviteTitle}>Invite collaborators</Text>
+            <Text style={styles.inviteSubtitle}>
+              Choose who can edit this trip with you.
+            </Text>
+            {trips.length > 0 ? (
+              <View style={styles.inviteTripSelector}>
+                {trips.map((trip) => {
+                  const active = trip.id === selectedTripId;
+                  return (
+                    <TouchableOpacity
+                      key={trip.id}
+                      onPress={() => setSelectedTripId(trip.id)}
+                      style={[
+                        styles.inviteTripPill,
+                        active && styles.inviteTripPillActive,
+                      ]}
+                      accessibilityRole="button"
+                    >
+                      <Text
+                        style={[
+                          styles.inviteTripText,
+                          active && styles.inviteTripTextActive,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {trip.title}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={styles.inviteEmpty}>
+                <Text style={styles.inviteEmptyText}>
+                  Create a trip before inviting collaborators.
+                </Text>
+              </View>
+            )}
+            <View style={styles.inviteList}>
+              {mockUsers.map((user) => {
+                const invited = invitedIds.includes(user.id);
+                const assigned =
+                  selectedTripId &&
+                  trips.find((trip) => trip.id === selectedTripId)?.collaborators.includes(user.id);
+                return (
+                  <View key={user.id} style={styles.inviteRow}>
+                    <View
+                      style={[
+                        styles.inviteAvatar,
+                        { backgroundColor: user.avatarColor },
+                      ]}
+                    >
+                      <Text style={styles.inviteAvatarText}>{user.initials}</Text>
+                    </View>
+                    <Text style={styles.inviteName}>{user.name}</Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.inviteAction,
+                        (invited || assigned) && styles.inviteActionActive,
+                      ]}
+                      onPress={() => {
+                        if (!selectedTripId) return;
+                        if (assigned) {
+                          removeCollaborator(selectedTripId, user.id);
+                          setInvitedIds((prev) => prev.filter((id) => id !== user.id));
+                          return;
+                        }
+                        addCollaborator(selectedTripId, user.id);
+                        setInvitedIds((prev) =>
+                          prev.includes(user.id) ? prev : [...prev, user.id]
+                        );
+                      }}
+                      accessibilityRole="button"
+                    >
+                      <Send
+                        size={14}
+                        color={invited || assigned ? "#FFFFFF" : "#1E1E1E"}
+                      />
+                      <Text
+                        style={[
+                          styles.inviteActionText,
+                          (invited || assigned) && styles.inviteActionTextActive,
+                        ]}
+                      >
+                        {assigned ? "Remove" : invited ? "Sent" : "Invite"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+            <View style={styles.inviteActionsRow}>
+              <TouchableOpacity
+                style={styles.inviteSecondary}
+                onPress={() => setInviteVisible(false)}
+                accessibilityRole="button"
+              >
+                <Text style={styles.inviteSecondaryText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.invitePrimary}
+                onPress={() => setInviteVisible(false)}
+                accessibilityRole="button"
+              >
+                <Text style={styles.invitePrimaryText}>Invite more</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }

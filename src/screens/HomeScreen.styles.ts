@@ -3,7 +3,7 @@ import { StyleSheet } from "react-native";
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F7",
+    backgroundColor: "#FFFFFF",
   },
   safeArea: {
     flex: 1,
@@ -132,10 +132,71 @@ const styles = StyleSheet.create({
   },
   gradientLayer: {
     flex: 1,
-    backgroundColor: "#F5F5F7",
+    backgroundColor: "#FFFFFF",
   },
   bottomSpacer: {
     height: 120,
+  },
+  profilePromptOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "rgba(15, 23, 42, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  profilePromptCard: {
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  profilePromptTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1E1E1E",
+    marginBottom: 6,
+  },
+  profilePromptText: {
+    fontSize: 14,
+    color: "#6B7280",
+    lineHeight: 20,
+  },
+  profilePromptActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+  },
+  profilePromptSecondary: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+  profilePromptSecondaryText: {
+    color: "#6B7280",
+    fontWeight: "600",
+  },
+  profilePromptPrimary: {
+    flex: 1,
+    backgroundColor: "#1E1E1E",
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+  profilePromptPrimaryText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
 });
 

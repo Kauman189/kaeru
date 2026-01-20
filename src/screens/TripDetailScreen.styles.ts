@@ -72,6 +72,14 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "white",
   },
+  avatarStacked: {
+    marginLeft: -10,
+  },
+  avatarText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1E1E1E",
+  },
   imageIndicators: {
     position: "absolute",
     bottom: 16,
@@ -143,6 +151,41 @@ const styles = StyleSheet.create({
     height: 16,
     backgroundColor: "#D1D5DB",
     marginHorizontal: 12,
+  },
+  visibilityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 14,
+  },
+  visibilityLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  visibilityOptions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  visibilityChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#FFFFFF",
+  },
+  visibilityChipActive: {
+    backgroundColor: "#1E1E1E",
+    borderColor: "#1E1E1E",
+  },
+  visibilityChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#1E1E1E",
+  },
+  visibilityChipTextActive: {
+    color: "#FFFFFF",
   },
   divider: {
     height: 1,

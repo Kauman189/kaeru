@@ -17,11 +17,12 @@ import { User, Mountain, Map, Copy, Heart, MessageCircle, Pencil } from "lucide-
 import styles from "./TripDetailScreen.styles";
 import { useTrips } from "../store/tripsContext";
 import MapView, { Marker, PROVIDER_DEFAULT, Region } from "react-native-maps";
+import { MOCK_USERS } from "../mock/users";
 
 type Props = NativeStackScreenProps<RootStackParamList, "TripDetail">;
 
 export default function TripDetailScreen({ navigation, route }: Props) {
-  const { trips } = useTrips();
+  const { trips, updateTripVisibility } = useTrips();
   const tripId = route.params?.tripId;
   const source = route.params?.source;
   const trip = tripId ? trips.find((item) => item.id === tripId) : undefined;
@@ -55,6 +56,13 @@ export default function TripDetailScreen({ navigation, route }: Props) {
     : "5 points";
   const tripDuration = trip?.duration ?? "October 3 days";
   const tripTags = trip?.tags?.length ? trip.tags : ["Cultural", "Adventure", "Food Tour", "City"];
+  const tripVisibility = trip?.visibility ?? "public";
+  const canEditVisibility = source === "my" && tripId != null;
+  const collaboratorUsers = (trip?.collaborators || [])
+    .map((id) => MOCK_USERS.find((user) => user.id === id))
+    .filter(Boolean);
+  const visibleCollaborators = collaboratorUsers.slice(0, 3) as typeof MOCK_USERS;
+  const extraCollaborators = collaboratorUsers.length - visibleCollaborators.length;
   const tripDescription =
     trip?.destination
       ? `Trip through ${trip.destination}, combining local culture, food, and hidden spots tailored to your route.`
@@ -131,17 +139,27 @@ export default function TripDetailScreen({ navigation, route }: Props) {
             <Mountain size={80} color="white" />
             <Text style={styles.mainImageText}>Great Buddha of Kamakura</Text>
           </View>
-          <View style={styles.avatarsContainer}>
-            <View style={[styles.avatar, { backgroundColor: '#E8F4E8' }]}>
-              <User size={20} color="#4B5563" />
+          {visibleCollaborators.length > 0 && (
+            <View style={styles.avatarsContainer}>
+              {visibleCollaborators.map((user, index) => (
+                <View
+                  key={user.id}
+                  style={[
+                    styles.avatar,
+                    { backgroundColor: user.avatarColor },
+                    index > 0 && styles.avatarStacked,
+                  ]}
+                >
+                  <Text style={styles.avatarText}>{user.initials}</Text>
+                </View>
+              ))}
+              {extraCollaborators > 0 && (
+                <View style={[styles.avatar, styles.avatarStacked]}>
+                  <Text style={styles.avatarText}>+{extraCollaborators}</Text>
+                </View>
+              )}
             </View>
-            <View style={[styles.avatar, { backgroundColor: '#F4E8F4', marginLeft: -10 }]}>
-              <User size={20} color="#4B5563" />
-            </View>
-            <View style={[styles.avatar, { backgroundColor: '#F4F4E8', marginLeft: -10 }]}>
-              <User size={20} color="#4B5563" />
-            </View>
-          </View>
+          )}
           <View style={styles.imageIndicators}>
             <View style={[styles.imageIndicator, styles.imageIndicatorActive]} />
             <View style={styles.imageIndicator} />
@@ -186,6 +204,46 @@ export default function TripDetailScreen({ navigation, route }: Props) {
           <View style={styles.statDivider} />
           <Text style={styles.statText}>{tripDuration}</Text>
         </View>
+
+        {canEditVisibility && (
+          <View style={styles.visibilityRow}>
+            <Text style={styles.visibilityLabel}>Visibility</Text>
+            <View style={styles.visibilityOptions}>
+              <Pressable
+                style={[
+                  styles.visibilityChip,
+                  tripVisibility === "public" && styles.visibilityChipActive,
+                ]}
+                onPress={() => updateTripVisibility(tripId!, "public")}
+              >
+                <Text
+                  style={[
+                    styles.visibilityChipText,
+                    tripVisibility === "public" && styles.visibilityChipTextActive,
+                  ]}
+                >
+                  Public
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.visibilityChip,
+                  tripVisibility === "private" && styles.visibilityChipActive,
+                ]}
+                onPress={() => updateTripVisibility(tripId!, "private")}
+              >
+                <Text
+                  style={[
+                    styles.visibilityChipText,
+                    tripVisibility === "private" && styles.visibilityChipTextActive,
+                  ]}
+                >
+                  Private
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
 
         <View style={styles.divider} />
 

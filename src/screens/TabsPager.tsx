@@ -4,6 +4,7 @@ import PagerView from "react-native-pager-view";
 import { Briefcase, Globe, User } from "lucide-react-native";
 import HomeScreen from "./HomeScreen";
 import MyTripsScreen from "./MyTripsScreen";
+import ProfileScreen from "./ProfileScreen";
 import styles from "./TabsPager.styles";
 
 const TAB_SIZE = 36;
@@ -106,6 +107,9 @@ export default function TabsPager() {
         <View key="my-trips" style={{ flex: 1 }}>
           <MyTripsScreen onTabBarVisibilityChange={setTabBarVisible} />
         </View>
+        <View key="profile" style={{ flex: 1 }}>
+          <ProfileScreen onTabBarVisibilityChange={setTabBarVisible} />
+        </View>
       </AnimatedPagerView>
 
       <Animated.View
@@ -141,7 +145,11 @@ export default function TabsPager() {
         >
           <Briefcase size={20} color={getIconColor(1)} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.tabItem} accessibilityRole="button">
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={() => setPage(2)}
+          accessibilityRole="button"
+        >
           <User size={20} color={getIconColor(2)} />
         </TouchableOpacity>
       </Animated.View>

@@ -38,6 +38,7 @@ export default function CreateTripScreen({ navigation }: Props) {
   const [duration, setDuration] = useState("");
   const [budget, setBudget] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [stops, setStops] = useState<TripStop[]>([]);
   const [stopTitle, setStopTitle] = useState("");
   const [stopAddress, setStopAddress] = useState("");
@@ -198,6 +199,8 @@ export default function CreateTripScreen({ navigation }: Props) {
       budget: budget || "-",
       tags: selectedTags,
       stops,
+      visibility,
+      collaborators: [],
     });
     navigation.navigate("Tabs");
   };
@@ -487,8 +490,61 @@ export default function CreateTripScreen({ navigation }: Props) {
                       {totalStopsPrice > 0 ? `$${totalStopsPrice.toFixed(2)}` : "-"}
                     </Text>
                   </View>
+                  <View style={styles.reviewLine}>
+                    <Text style={styles.reviewLabel}>Visibility</Text>
+                    <Text style={styles.reviewValue}>
+                      {visibility === "public" ? "Public" : "Private"}
+                    </Text>
+                  </View>
                   <View style={{ height: 6 }} />
                   <Text style={styles.mapHint}>{stops.length} stops</Text>
+                </View>
+
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Visibility</Text>
+                  <Text style={styles.mapHint}>
+                    Choose who can see and copy your trip.
+                  </Text>
+                  <View style={styles.visibilityRow}>
+                    <Pressable
+                      style={[
+                        styles.visibilityOption,
+                        visibility === "public" && styles.visibilityOptionActive,
+                      ]}
+                      onPress={() => setVisibility("public")}
+                    >
+                      <Text
+                        style={[
+                          styles.visibilityText,
+                          visibility === "public" && styles.visibilityTextActive,
+                        ]}
+                      >
+                        Public
+                      </Text>
+                      <Text style={styles.visibilitySubtext}>
+                        Visible in Discover
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.visibilityOption,
+                        visibility === "private" && styles.visibilityOptionActive,
+                      ]}
+                      onPress={() => setVisibility("private")}
+                    >
+                      <Text
+                        style={[
+                          styles.visibilityText,
+                          visibility === "private" && styles.visibilityTextActive,
+                        ]}
+                      >
+                        Private
+                      </Text>
+                      <Text style={styles.visibilitySubtext}>
+                        Only you & collaborators
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
 
                 <View style={styles.card}>

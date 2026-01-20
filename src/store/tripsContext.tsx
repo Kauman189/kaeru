@@ -18,11 +18,17 @@ export type Trip = {
   budget: string;
   tags: string[];
   stops: TripStop[];
+  visibility: "public" | "private";
+  collaborators: string[];
 };
 
 type TripsContextValue = {
   trips: Trip[];
   addTrip: (trip: Omit<Trip, "id">) => void;
+  updateTrip: (tripId: string, updates: Partial<Trip>) => void;
+  updateTripVisibility: (tripId: string, visibility: Trip["visibility"]) => void;
+  addCollaborator: (tripId: string, userId: string) => void;
+  removeCollaborator: (tripId: string, userId: string) => void;
 };
 
 const TripsContext = createContext<TripsContextValue | undefined>(undefined);
@@ -40,7 +46,50 @@ export function TripsProvider({ children }: { children: React.ReactNode }) {
     ]);
   };
 
-  const value = useMemo(() => ({ trips, addTrip }), [trips]);
+  const updateTrip = (tripId: string, updates: Partial<Trip>) => {
+    setTrips((prev) =>
+      prev.map((trip) => (trip.id === tripId ? { ...trip, ...updates } : trip))
+    );
+  };
+
+  const updateTripVisibility = (tripId: string, visibility: Trip["visibility"]) => {
+    updateTrip(tripId, { visibility });
+  };
+
+  const addCollaborator = (tripId: string, userId: string) => {
+    setTrips((prev) =>
+      prev.map((trip) =>
+        trip.id === tripId && !trip.collaborators.includes(userId)
+          ? { ...trip, collaborators: [...trip.collaborators, userId] }
+          : trip
+      )
+    );
+  };
+
+  const removeCollaborator = (tripId: string, userId: string) => {
+    setTrips((prev) =>
+      prev.map((trip) =>
+        trip.id === tripId
+          ? {
+              ...trip,
+              collaborators: trip.collaborators.filter((id) => id !== userId),
+            }
+          : trip
+      )
+    );
+  };
+
+  const value = useMemo(
+    () => ({
+      trips,
+      addTrip,
+      updateTrip,
+      updateTripVisibility,
+      addCollaborator,
+      removeCollaborator,
+    }),
+    [trips]
+  );
 
   return <TripsContext.Provider value={value}>{children}</TripsContext.Provider>;
 }
