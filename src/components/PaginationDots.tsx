@@ -1,5 +1,6 @@
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
+import styles from "./PaginationDots.styles";
 
 type PaginationDotsProps = {
   count: number;
@@ -27,23 +28,3 @@ export default function PaginationDots({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  dot: {
-    height: 10,
-    width: 40,
-    borderRadius: 999,
-  },
-  dotActive: {
-    backgroundColor: "#1E1E1E",
-  },
-  dotInactive: {
-    backgroundColor: "rgba(30,30,30,0.25)",
-  },
-});

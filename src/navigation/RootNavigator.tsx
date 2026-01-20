@@ -7,14 +7,15 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import OnboardingScreen from "../screens/OnboardingScreen";
-import HomeScreen from "../screens/HomeScreen";
+import TabsPager from "../screens/TabsPager";
 import TripDetailScreen from "../screens/TripDetailScreen";
 import AuthScreen from "../screens/AuthScreen";
 import { getOnboardingSeen } from "../storage/onboardingStorage";
+import styles from "./RootNavigator.styles";
 
 export type RootStackParamList = {
   Onboarding: undefined;
-  Home: undefined;
+  Tabs: undefined;
   TripDetail: undefined;
   Auth: undefined;
 };
@@ -46,9 +47,9 @@ export default function RootNavigator() {
 
   if (!isReady) {
     return (
-      <SafeAreaView className="flex-1 bg-[#D9F1FF]">
-        <View className="flex-1 items-center justify-center">
-          <Text className="text-sm text-[#4B5563]">Cargando...</Text>
+      <SafeAreaView style={styles.loadingContainer}>
+        <View style={styles.loadingContent}>
+          <Text style={styles.loadingText}>Cargando...</Text>
         </View>
       </SafeAreaView>
     );
@@ -62,7 +63,7 @@ export default function RootNavigator() {
         initialRouteName="Onboarding"
       >
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Tabs" component={TabsPager} />
         <Stack.Screen 
           name="TripDetail" 
           component={TripDetailScreen}

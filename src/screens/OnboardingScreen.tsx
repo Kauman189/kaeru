@@ -5,7 +5,6 @@ import {
   Image,
   Pressable,
   StatusBar,
-  StyleSheet,
   Text,
   View,
   ViewToken,
@@ -18,6 +17,7 @@ import TextButton from "../components/TextButton";
 import TripCardPreview from "../components/TripCardPreview";
 import { setOnboardingSeen } from "../storage/onboardingStorage";
 import { RootStackParamList } from "../navigation/RootNavigator";
+import styles from "./OnboardingScreen.styles";
 
 type Slide = {
   key: string;
@@ -78,7 +78,7 @@ export default function OnboardingScreen({ navigation }: Props) {
   const handleCreateTrip = useCallback(() => {
     // TODO: Tras autenticar, persistir onboarding y reiniciar a Home.
     // await setOnboardingSeen();
-    // navigation.reset({ index: 0, routes: [{ name: "Home" }] });
+    // navigation.reset({ index: 0, routes: [{ name: "Tabs" }] });
     navigation.navigate("Auth");
   }, [navigation]);
 
@@ -87,7 +87,7 @@ export default function OnboardingScreen({ navigation }: Props) {
     await setOnboardingSeen();
     navigation.reset({
       index: 0,
-      routes: [{ name: "Home" }],
+      routes: [{ name: "Tabs" }],
     });
   }, [navigation]);
 
@@ -206,7 +206,7 @@ export default function OnboardingScreen({ navigation }: Props) {
           <TextButton
             label="Saltar"
             onPress={handleSkip}
-            textClassName="text-sm font-semibold text-[#1E1E1E]"
+            textStyle={styles.skipButtonText}
           />
         </SafeAreaView>
       )}
@@ -234,192 +234,3 @@ export default function OnboardingScreen({ navigation }: Props) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#D9F1FF',
-  },
-  slide: {
-    width,
-    height,
-  },
-  cloudsContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 120,
-  },
-  cloud: {
-    position: 'absolute',
-    backgroundColor: 'white',
-    borderRadius: 50,
-  },
-  contentContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingBottom: 200,
-  },
-  titleText: {
-    fontSize: 48,
-    fontWeight: '700',
-    fontStyle: 'italic',
-    color: '#1E1E1E',
-    textAlign: 'center',
-  },
-  subtitleText: {
-    fontSize: 20,
-    color: '#1E1E1E',
-    textAlign: 'center',
-    marginTop: 24,
-    lineHeight: 28,
-  },
-  grassContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: -50,
-    right: -50,
-    height: 200,
-    overflow: 'hidden',
-  },
-  grass: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 180,
-    backgroundColor: '#DFF8AE',
-    borderTopLeftRadius: 300,
-    borderTopRightRadius: 300,
-  },
-  frogContainer: {
-    position: 'absolute',
-    bottom: 100,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  otherSlideContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    paddingTop: 48,
-    paddingBottom: 112,
-  },
-  slide2Content: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 140,
-  },
-  slide2Subtitle: {
-    fontSize: 20,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginTop: 16,
-    lineHeight: 28,
-    fontStyle: 'italic',
-  },
-  cardWithHand: {
-    marginTop: 32,
-    position: 'relative',
-  },
-  handIconContainer: {
-    position: 'absolute',
-    right: -10,
-    bottom: -20,
-  },
-  handEmoji: {
-    fontSize: 40,
-    transform: [{ rotate: '-20deg' }],
-  },
-  slide3Content: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingTop: 160,
-  },
-  titleTextLarge: {
-    fontSize: 64,
-    fontWeight: '700',
-    fontStyle: 'italic',
-    color: '#1E1E1E',
-    textAlign: 'center',
-  },
-  slide3Subtitle: {
-    fontSize: 22,
-    color: '#1E1E1E',
-    textAlign: 'center',
-    marginTop: 16,
-    fontWeight: '500',
-  },
-  slide3Helper: {
-    fontSize: 18,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginTop: 12,
-    lineHeight: 26,
-  },
-  ctaContainer: {
-    marginTop: 40,
-    width: '100%',
-    alignItems: 'center',
-    gap: 16,
-  },
-  secondaryButton: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: '#1E1E1E',
-  },
-  secondaryButtonText: {
-    color: '#1E1E1E',
-    fontSize: 18,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
-  noLoginText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 8,
-  },
-  skyBackground: {
-    backgroundColor: '#D9F1FF',
-  },
-  skipButtonContainer: {
-    position: 'absolute',
-    top: 0,
-    right: 24,
-    zIndex: 10,
-  },
-  paginationContainer: {
-    position: 'absolute',
-    bottom: 86,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 4,
-  },
-  copyrightContainer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  copyrightText: {
-    fontSize: 12,
-    color: '#4B5563',
-    fontStyle: 'italic',
-    opacity: 0.6,
-  },
-});

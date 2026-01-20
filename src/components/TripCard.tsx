@@ -1,6 +1,7 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity } from "react-native";
 import { Tag, MapPinned, Users, Building2, Utensils, Image } from "lucide-react-native";
+import styles from "./TripCard.styles";
 
 export type TripData = {
   id: string;
@@ -19,14 +20,38 @@ type TripCardProps = {
 };
 
 export default function TripCard({ trip, onPress, showAuthor = false }: TripCardProps) {
+  const getTagVariant = (tag: string) => {
+    const lower = tag.toLowerCase();
+    if (lower.includes("friend") || lower.includes("people") || lower.includes("solo") || lower.includes("couple") || lower.includes("family")) {
+      return "people";
+    }
+    if (lower.includes("food")) {
+      return "food";
+    }
+    if (lower.includes("tourism") || lower.includes("city") || lower.includes("cultural") || lower.includes("adventure") || lower.includes("nature")) {
+      return "tourism";
+    }
+    return "default";
+  };
+
   const getTagIcon = (tag: string) => {
+    const variant = getTagVariant(tag);
+    const iconColor = variant === "default" ? "#6B7280" : "#1E1E1E";
     switch (tag) {
       case '2-4 Friends':
-        return <Users size={12} color="#6B7280" />;
+      case 'Solo':
+      case 'Couple':
+      case 'Family':
+        return <Users size={12} color={iconColor} />;
       case 'City Tourism':
-        return <Building2 size={12} color="#6B7280" />;
+      case 'Cultural':
+      case 'Adventure':
+      case 'Nature':
+      case 'City':
+        return <Building2 size={12} color={iconColor} />;
       case 'Foodie':
-        return <Utensils size={12} color="#6B7280" />;
+      case 'Food Tour':
+        return <Utensils size={12} color={iconColor} />;
       default:
         return null;
     }
@@ -60,12 +85,31 @@ export default function TripCard({ trip, onPress, showAuthor = false }: TripCard
           </View>
           
           <View style={styles.tags}>
-            {trip.tags.map((tag, index) => (
-              <View key={index} style={styles.tag}>
-                {getTagIcon(tag)}
-                <Text style={styles.tagText}>{tag}</Text>
-              </View>
-            ))}
+            {trip.tags.map((tag, index) => {
+              const variant = getTagVariant(tag);
+              return (
+                <View
+                  key={index}
+                  style={[
+                    styles.tag,
+                    variant === "people" && styles.tagPeople,
+                    variant === "tourism" && styles.tagTourism,
+                    variant === "food" && styles.tagFood,
+                    variant === "default" && styles.tagDefault,
+                  ]}
+                >
+                  {getTagIcon(tag)}
+                  <Text
+                    style={[
+                      styles.tagText,
+                      variant === "default" ? styles.tagTextMuted : styles.tagTextDark,
+                    ]}
+                  >
+                    {tag}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         </View>
         
@@ -78,89 +122,3 @@ export default function TripCard({ trip, onPress, showAuthor = false }: TripCard
     </TouchableOpacity>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginHorizontal: 20,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  authorAvatar: {
-    position: 'absolute',
-    top: -8,
-    left: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  content: {
-    flexDirection: 'row',
-  },
-  info: {
-    flex: 1,
-    paddingRight: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E1E1E',
-    marginBottom: 8,
-  },
-  stats: {
-    flexDirection: 'row',
-    gap: 20,
-    marginBottom: 12,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  tags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  tag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 14,
-  },
-  tagText: {
-    fontSize: 11,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  imageContainer: {
-    width: 120,
-    height: 130,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  imagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#E0F2FE',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

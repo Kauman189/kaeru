@@ -1,5 +1,6 @@
 import React from "react";
-import { Pressable, Text, StyleSheet } from "react-native";
+import { Pressable, Text } from "react-native";
+import styles from "./PrimaryButton.styles";
 
 type PrimaryButtonProps = {
   label: string;
@@ -13,20 +14,3 @@ export default function PrimaryButton({ label, onPress }: PrimaryButtonProps) {
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  button: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1E1E1E',
-    paddingVertical: 18,
-    paddingHorizontal: 32,
-    borderRadius: 30,
-  },
-  text: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-});

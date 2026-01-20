@@ -2,28 +2,24 @@
  * Boton de texto para acciones secundarias.
  */
 import React from "react";
-import { Pressable, Text } from "react-native";
+import { Pressable, StyleProp, Text, TextStyle, ViewStyle } from "react-native";
 
 type TextButtonProps = {
   label: string;
   onPress: () => void;
-  className?: string;
-  textClassName?: string;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
 };
 
 export default function TextButton({
   label,
   onPress,
-  className,
-  textClassName,
+  style,
+  textStyle,
 }: TextButtonProps) {
   return (
-    <Pressable
-      onPress={onPress}
-      className={className}
-      accessibilityRole="button"
-    >
-      <Text className={textClassName}>{label}</Text>
+    <Pressable onPress={onPress} style={style} accessibilityRole="button">
+      <Text style={textStyle}>{label}</Text>
     </Pressable>
   );
 }

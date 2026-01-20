@@ -1,30 +1,66 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   Animated,
   StatusBar,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { User, Mic, SlidersHorizontal, Briefcase, Globe } from "lucide-react-native";
+import { User, Mic, SlidersHorizontal } from "lucide-react-native";
 import TripCard, { TripData } from "../components/TripCard";
+import styles from "./HomeScreen.styles";
+import { RootStackParamList } from "../navigation/RootNavigator";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 const TRIPS: TripData[] = [
-  { id: '1', title: 'Trip to Tokyo 5 days', price: '600$avg', points: '5 points', tags: ['2-4 Friends', 'City Tourism', 'Foodie'], authorId: 'user1' },
-  { id: '2', title: 'Trip to Tokyo 5 days', price: '600$avg', points: '5 points', tags: ['2-4 Friends', 'City Tourism', 'Foodie'] },
-  { id: '3', title: 'Trip to Tokyo 5 days', price: '600$avg', points: '5 points', tags: ['2-4 Friends', 'City Tourism', 'Foodie'] },
-  { id: '4', title: 'Trip to Tokyo 5 days', price: '600$avg', points: '5 points', tags: ['2-4 Friends', 'City Tourism', 'Foodie'] },
+  {
+    id: "1",
+    title: "Tokyo in 5 days",
+    price: "$620 avg",
+    points: "8 points",
+    tags: ["2-4 Friends", "City Tourism", "Foodie"],
+    authorId: "user1",
+  },
+  {
+    id: "2",
+    title: "Sevilla Food Weekend",
+    price: "$280 avg",
+    points: "4 points",
+    tags: ["Couple", "City Tourism", "Food Tour"],
+    authorId: "user2",
+  },
+  {
+    id: "3",
+    title: "Alps Hike 3 days",
+    price: "$420 avg",
+    points: "6 points",
+    tags: ["2-4 Friends", "Adventure", "Nature"],
+    authorId: "user3",
+  },
+  {
+    id: "4",
+    title: "Lisbon Culture Sprint",
+    price: "$350 avg",
+    points: "5 points",
+    tags: ["Solo", "Cultural", "City Tourism"],
+    authorId: "user4",
+  },
 ];
 
-const FILTERS = ['2-4 Friends', '< 600 $'];
+const FILTERS = ["2-4 Friends", "< 600 $"];
 
-export default function HomeScreen() {
+type HomeScreenProps = {
+  onTabBarVisibilityChange?: (visible: boolean) => void;
+};
+
+export default function HomeScreen({ onTabBarVisibilityChange }: HomeScreenProps) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const scrollY = useRef(new Animated.Value(0)).current;
   const lastScrollY = useRef(0);
-  const [tabBarVisible, setTabBarVisible] = useState(true);
+  const barVisibleRef = useRef(true);
 
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -33,14 +69,38 @@ export default function HomeScreen() {
       listener: (event: any) => {
         const currentY = event.nativeEvent.contentOffset.y;
         if (currentY > lastScrollY.current && currentY > 50) {
-          setTabBarVisible(false);
+          if (barVisibleRef.current) {
+            barVisibleRef.current = false;
+            onTabBarVisibilityChange?.(false);
+          }
         } else if (currentY < lastScrollY.current) {
-          setTabBarVisible(true);
+          if (!barVisibleRef.current) {
+            barVisibleRef.current = true;
+            onTabBarVisibilityChange?.(true);
+          }
         }
         lastScrollY.current = currentY;
       },
     }
   );
+
+  useEffect(() => {
+    onTabBarVisibilityChange?.(true);
+  }, [onTabBarVisibilityChange]);
+
+  const getFilterVariant = (filter: string) => {
+    const lower = filter.toLowerCase();
+    if (lower.includes("friend") || lower.includes("people") || lower.includes("solo") || lower.includes("couple") || lower.includes("family")) {
+      return "people";
+    }
+    if (lower.includes("food")) {
+      return "food";
+    }
+    if (lower.includes("tourism") || lower.includes("city") || lower.includes("cultural") || lower.includes("adventure") || lower.includes("nature")) {
+      return "tourism";
+    }
+    return "default";
+  };
 
   return (
     <View style={styles.container}>
@@ -76,8 +136,26 @@ export default function HomeScreen() {
             <View style={styles.discoverLeft}>
               <Text style={styles.discoverTitle}>Discover</Text>
               {FILTERS.map((filter, index) => (
-                <View key={index} style={styles.filterChip}>
-                  <Text style={styles.filterText}>{filter}</Text>
+                <View
+                  key={index}
+                  style={[
+                    styles.filterChip,
+                    getFilterVariant(filter) === "people" && styles.filterChipPeople,
+                    getFilterVariant(filter) === "tourism" && styles.filterChipTourism,
+                    getFilterVariant(filter) === "food" && styles.filterChipFood,
+                    getFilterVariant(filter) === "default" && styles.filterChipDefault,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterText,
+                      getFilterVariant(filter) === "default"
+                        ? styles.filterTextMuted
+                        : styles.filterTextDark,
+                    ]}
+                  >
+                    {filter}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -94,11 +172,11 @@ export default function HomeScreen() {
               key={trip.id}
               trip={trip}
               showAuthor={index === 0}
-              onPress={() => console.log('Trip pressed:', trip.id)}
+              onPress={() => navigation.navigate("TripDetail")}
             />
           ))}
 
-          <View style={{ height: 120 }} />
+          <View style={styles.bottomSpacer} />
         </Animated.ScrollView>
       </SafeAreaView>
 
@@ -111,160 +189,6 @@ export default function HomeScreen() {
         <View style={[styles.gradientLayer, { opacity: 1 }]} />
       </View>
 
-      <Animated.View
-        style={[
-          styles.tabBar,
-          {
-            transform: [{ translateY: tabBarVisible ? 0 : 100 }],
-            opacity: tabBarVisible ? 1 : 0,
-          },
-        ]}
-      >
-        <TouchableOpacity style={styles.tabItem}>
-          <Globe size={24} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tabItem}>
-          <Briefcase size={24} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tabItem}>
-          <User size={24} color="white" />
-        </TouchableOpacity>
-      </Animated.View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F7',
-  },
-  safeArea: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 4,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginTop: 16,
-    marginBottom: 20,
-    paddingHorizontal: 20,
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1E1E1E',
-    lineHeight: 36,
-  },
-  avatarContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#E5E7EB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 28,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    marginBottom: 20,
-    marginHorizontal: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: '#1E1E1E',
-  },
-  discoverHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    paddingHorizontal: 20,
-  },
-  discoverLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flexWrap: 'wrap',
-    flex: 1,
-  },
-  discoverTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E1E1E',
-    marginRight: 4,
-  },
-  filterChip: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  filterText: {
-    fontSize: 13,
-    color: '#4B5563',
-    fontWeight: '500',
-  },
-  filterButton: {
-    position: 'relative',
-    padding: 8,
-  },
-  filterBadge: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    backgroundColor: '#1E1E1E',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filterBadgeText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  bottomGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 150,
-    flexDirection: 'column',
-  },
-  gradientLayer: {
-    flex: 1,
-    backgroundColor: '#F5F5F7',
-  },
-  tabBar: {
-    position: 'absolute',
-    bottom: 40,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    backgroundColor: '#1E1E1E',
-    borderRadius: 32,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    gap: 36,
-  },
-  tabItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

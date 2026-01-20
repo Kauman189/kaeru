@@ -1,24 +1,77 @@
 /**
  * Pantalla de detalle con la informacion completa del viaje.
  */
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  Dimensions,
+  Animated,
+  Easing,
+  Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
-import { User, Mountain, Map } from "lucide-react-native";
-
-const { width } = Dimensions.get("window");
+import { User, Mountain, Map, Copy, Heart, MessageCircle } from "lucide-react-native";
+import styles from "./TripDetailScreen.styles";
 
 type Props = NativeStackScreenProps<RootStackParamList, "TripDetail">;
 
 export default function TripDetailScreen({ navigation }: Props) {
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const lastScrollY = useRef(0);
+  const [tabBarVisible, setTabBarVisible] = useState(true);
+  const barTranslate = useRef(new Animated.Value(0)).current;
+  const barOpacity = useRef(new Animated.Value(1)).current;
+
+  const getTagVariant = (tag: string) => {
+    const lower = tag.toLowerCase();
+    if (lower.includes("friend") || lower.includes("people") || lower.includes("solo") || lower.includes("couple") || lower.includes("family")) {
+      return "people";
+    }
+    if (lower.includes("food")) {
+      return "food";
+    }
+    if (lower.includes("tourism") || lower.includes("city") || lower.includes("cultural") || lower.includes("adventure") || lower.includes("nature")) {
+      return "tourism";
+    }
+    return "default";
+  };
+
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    {
+      useNativeDriver: false,
+      listener: (event: any) => {
+        const currentY = event.nativeEvent.contentOffset.y;
+        if (currentY > lastScrollY.current && currentY > 50) {
+          setTabBarVisible(false);
+        } else if (currentY < lastScrollY.current) {
+          setTabBarVisible(true);
+        }
+        lastScrollY.current = currentY;
+      },
+    }
+  );
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(barTranslate, {
+        toValue: tabBarVisible ? 0 : 70,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(barOpacity, {
+        toValue: tabBarVisible ? 1 : 0,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [barOpacity, barTranslate, tabBarVisible]);
+
   return (
     <View style={styles.container}>
       <View style={styles.headerBackground}>
@@ -31,10 +84,12 @@ export default function TripDetailScreen({ navigation }: Props) {
         <View style={styles.dragIndicator} />
       </SafeAreaView>
 
-      <ScrollView 
+      <Animated.ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         <View style={styles.imageContainer}>
           <View style={styles.mainImagePlaceholder}>
@@ -61,18 +116,30 @@ export default function TripDetailScreen({ navigation }: Props) {
         </View>
 
         <View style={styles.tagsContainer}>
-          <View style={styles.tag}>
-            <Text style={styles.tagText}>Cultural</Text>
-          </View>
-          <View style={styles.tag}>
-            <Text style={styles.tagText}>Adventure</Text>
-          </View>
-          <View style={styles.tag}>
-            <Text style={styles.tagText}>Food Tour</Text>
-          </View>
-          <View style={styles.tag}>
-            <Text style={styles.tagText}>City</Text>
-          </View>
+          {["Cultural", "Adventure", "Food Tour", "City"].map((tag) => {
+            const variant = getTagVariant(tag);
+            return (
+              <View
+                key={tag}
+                style={[
+                  styles.tag,
+                  variant === "people" && styles.tagPeople,
+                  variant === "tourism" && styles.tagTourism,
+                  variant === "food" && styles.tagFood,
+                  variant === "default" && styles.tagDefault,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tagText,
+                    variant === "default" ? styles.tagTextMuted : styles.tagTextDark,
+                  ]}
+                >
+                  {tag}
+                </Text>
+              </View>
+            );
+          })}
         </View>
 
         <Text style={styles.tripTitle}>Trip to Tokyo 5 days</Text>
@@ -125,194 +192,40 @@ export default function TripDetailScreen({ navigation }: Props) {
           <Text style={styles.itineraryText}>Excursión Monte Fuji</Text>
         </View>
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
+        <View style={styles.bottomSpacer} />
+      </Animated.ScrollView>
+
+      <Animated.View
+        style={[
+          styles.floatingBar,
+          {
+            transform: [{ translateY: barTranslate }],
+            opacity: barOpacity,
+          },
+        ]}
+      >
+        <Pressable onPress={() => console.log("Copy trip")} accessibilityRole="button">
+          <View style={styles.actionItem}>
+            <View style={[styles.actionButton, styles.actionCopy]}>
+              <Copy size={18} color="#1E1E1E" />
+            </View>
+          </View>
+        </Pressable>
+        <Pressable onPress={() => console.log("Like trip")} accessibilityRole="button">
+          <View style={styles.actionItem}>
+            <View style={[styles.actionButton, styles.actionLike]}>
+              <Heart size={18} color="#1E1E1E" />
+            </View>
+          </View>
+        </Pressable>
+        <Pressable onPress={() => console.log("Ask creator")} accessibilityRole="button">
+          <View style={styles.actionItem}>
+            <View style={[styles.actionButton, styles.actionAsk]}>
+              <MessageCircle size={18} color="#1E1E1E" />
+            </View>
+          </View>
+        </Pressable>
+      </Animated.View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  headerBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 120,
-  },
-  cloud: {
-    position: 'absolute',
-    backgroundColor: 'white',
-    borderRadius: 40,
-  },
-  dragIndicatorContainer: {
-    alignItems: 'center',
-    paddingTop: 8,
-  },
-  dragIndicator: {
-    width: 40,
-    height: 5,
-    backgroundColor: '#D1D5DB',
-    borderRadius: 3,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  imageContainer: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: '#E5E7EB',
-  },
-  mainImage: {
-    width: '100%',
-    height: 280,
-    backgroundColor: '#4A7C59',
-  },
-  mainImagePlaceholder: {
-    width: '100%',
-    height: 280,
-    backgroundColor: '#4A7C59',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mainImageText: {
-    color: 'white',
-    fontSize: 16,
-    marginTop: 8,
-    fontWeight: '600',
-  },
-  avatarsContainer: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    flexDirection: 'row',
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
-  },
-  imageIndicators: {
-    position: 'absolute',
-    bottom: 16,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  imageIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-  },
-  imageIndicatorActive: {
-    backgroundColor: 'white',
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 16,
-  },
-  tag: {
-    backgroundColor: '#E5E7EB',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  tagText: {
-    fontSize: 12,
-    color: '#4B5563',
-  },
-  tripTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1E1E1E',
-    marginTop: 20,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  statText: {
-    fontSize: 14,
-    color: '#4B5563',
-  },
-  statDivider: {
-    width: 1,
-    height: 16,
-    backgroundColor: '#D1D5DB',
-    marginHorizontal: 12,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: 20,
-  },
-  descriptionContainer: {
-    marginBottom: 16,
-  },
-  descriptionText: {
-    fontSize: 15,
-    lineHeight: 24,
-    color: '#374151',
-  },
-  mapContainer: {
-    marginBottom: 8,
-  },
-  mapPlaceholder: {
-    height: 160,
-    backgroundColor: '#E8F4FC',
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  mapSubtext: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1E1E1E',
-    marginBottom: 16,
-  },
-  itineraryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  dayBadge: {
-    backgroundColor: '#DFF8AE',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    marginRight: 12,
-  },
-  dayText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1E1E1E',
-  },
-  itineraryText: {
-    fontSize: 15,
-    color: '#374151',
-  },
-});
