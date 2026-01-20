@@ -170,6 +170,30 @@ const styles = StyleSheet.create({
     marginTop: 16,
     gap: 12,
   },
+  inviteCurrent: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  inviteCurrentTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6B7280",
+    marginBottom: 8,
+  },
+  inviteCurrentList: {
+    gap: 10,
+  },
+  inviteCurrentItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  inviteStatus: {
+    fontSize: 11,
+    color: "#6B7280",
+  },
   inviteRow: {
     flexDirection: "row",
     alignItems: "center",
