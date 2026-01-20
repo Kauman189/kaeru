@@ -110,6 +110,20 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#1E1E1E",
   },
+  errorText: {
+    marginTop: 12,
+    color: "#DC2626",
+    fontSize: 12,
+  },
+  modeToggle: {
+    marginTop: 16,
+    alignItems: "center",
+  },
+  modeToggleText: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "600",
+  },
 });
 
 export default styles;

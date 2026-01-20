@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Image, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AtSign, Instagram, Twitter, User } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
-import { useProfile } from "../store/profileContext";
 import styles from "./ProfileScreen.styles";
+import { supabase } from "../lib/supabase";
+import { getProfileById, getProfilesByIds } from "../services/profiles.service";
+import { getTripsByOwner } from "../services/trips.service";
 
 type ProfileScreenProps = {
   onTabBarVisibilityChange?: (visible: boolean) => void;
@@ -18,7 +20,6 @@ export default function ProfileScreen({
   isOwnProfile = true,
 }: ProfileScreenProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { profile } = useProfile();
   const scrollY = useRef(new Animated.Value(0)).current;
   const lastScrollY = useRef(0);
   const barVisibleRef = useRef(true);
@@ -27,31 +28,29 @@ export default function ProfileScreen({
   );
   const tabAnim = useRef(new Animated.Value(1)).current;
   const actionLabel = isOwnProfile ? "Edit" : "Follow +";
-  const displayName = profile.name || "Noah Thompson";
-  const displayBio =
-    profile.bio || "Product Designer who focuses on simplicity & usability.";
-  const friends = [
-    { id: "1", name: "Maya Costa" },
-    { id: "2", name: "Leo Park" },
-    { id: "3", name: "Ava Ruiz" },
-    { id: "4", name: "Noah Kim" },
-  ];
-  const badges = [
-    { id: "1", label: "City Expert" },
-    { id: "2", label: "Food Hunter" },
-    { id: "3", label: "Weekend Pro" },
-    { id: "4", label: "Solo Spark" },
-  ];
+  const [displayName, setDisplayName] = useState("Tu nombre");
+  const [displayBio, setDisplayBio] = useState("Aun no has añadido una bio.");
+  const [friends, setFriends] = useState<{ id: string; name: string }[]>([]);
+  const [badges, setBadges] = useState<{ id: string; label: string }[]>([]);
+  const [trips, setTrips] = useState<
+    { id: string; title: string; budget: string | null }[]
+  >([]);
+  const [likesCount, setLikesCount] = useState(0);
+  const [followersCount, setFollowersCount] = useState(0);
   const tabContent = useMemo(() => {
     if (activeTab === "badges") {
       return (
         <View style={styles.badgesGrid}>
-          {badges.map((badge) => (
-            <View key={badge.id} style={styles.badgeItem}>
-              <View style={styles.badgeIcon} />
-              <Text style={styles.badgeText}>{badge.label}</Text>
-            </View>
-          ))}
+          {badges.length === 0 ? (
+            <Text style={styles.sectionEmpty}>Actualmente no tienes insignias.</Text>
+          ) : (
+            badges.map((badge) => (
+              <View key={badge.id} style={styles.badgeItem}>
+                <View style={styles.badgeIcon} />
+                <Text style={styles.badgeText}>{badge.label}</Text>
+              </View>
+            ))
+          )}
         </View>
       );
     }
@@ -59,50 +58,43 @@ export default function ProfileScreen({
     if (activeTab === "friends") {
       return (
         <View style={styles.friendsGrid}>
-          {friends.map((friend) => (
-            <View key={friend.id} style={styles.friendItem}>
-              <View style={styles.friendAvatar}>
-                <User size={18} color="#6B7280" />
+          {friends.length === 0 ? (
+            <Text style={styles.sectionEmpty}>Actualmente no sigues a nadie.</Text>
+          ) : (
+            friends.map((friend) => (
+              <View key={friend.id} style={styles.friendItem}>
+                <View style={styles.friendAvatar}>
+                  <User size={18} color="#6B7280" />
+                </View>
+                <Text style={styles.friendName}>{friend.name}</Text>
               </View>
-              <Text style={styles.friendName}>{friend.name}</Text>
-            </View>
-          ))}
+            ))
+          )}
         </View>
       );
     }
 
+    if (trips.length === 0) {
+      return <Text style={styles.sectionEmpty}>Actualmente no tienes viajes.</Text>;
+    }
+
+    const trip = trips[0];
     return (
       <View style={styles.tripCard}>
         <View style={styles.tripInfo}>
-          <Text style={styles.tripTitle}>Trip to Tokyo 5 days</Text>
+          <Text style={styles.tripTitle}>{trip.title}</Text>
           <View style={styles.tripMetaRow}>
-            <Text style={styles.tripMeta}>$600 avg</Text>
+            <Text style={styles.tripMeta}>{trip.budget || "-"}</Text>
             <View style={styles.tripDot} />
-            <Text style={styles.tripMeta}>5 points</Text>
-          </View>
-          <View style={styles.tripChipsRow}>
-            <View style={styles.tripChip}>
-              <Text style={styles.tripChipText}>2-4 Friends</Text>
-            </View>
-            <View style={[styles.tripChip, styles.tripChipCity]}>
-              <Text style={styles.tripChipText}>City Tourism</Text>
-            </View>
-            <View style={[styles.tripChip, styles.tripChipFood]}>
-              <Text style={styles.tripChipText}>Foodie</Text>
-            </View>
+            <Text style={styles.tripMeta}>0 puntos</Text>
           </View>
         </View>
         <View style={styles.tripImage}>
-          <Image
-            source={{
-              uri: "https://images.unsplash.com/photo-1505761671935-60b3a7427bad?w=400&q=80",
-            }}
-            style={styles.tripImageInner}
-          />
+          <View style={styles.tripImageInner} />
         </View>
       </View>
     );
-  }, [activeTab, badges, friends]);
+  }, [activeTab, badges, friends, trips]);
 
   const handleTabPress = (tab: "trips" | "badges" | "friends") => {
     if (tab === activeTab) return;
@@ -147,6 +139,121 @@ export default function ProfileScreen({
     onTabBarVisibilityChange?.(true);
   }, [onTabBarVisibilityChange]);
 
+  useEffect(() => {
+    const loadProfile = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+      try {
+        const profile = await getProfileById(userData.user.id);
+        setDisplayName(profile.full_name || profile.username || "Tu nombre");
+        setDisplayBio(profile.bio || "Aun no has añadido una bio.");
+      } catch (error) {
+        setDisplayName("Tu nombre");
+      }
+    };
+
+    loadProfile();
+  }, []);
+
+  useEffect(() => {
+    const loadTrips = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+      try {
+        const data = await getTripsByOwner(userData.user.id);
+        setTrips(
+          data.map((trip) => ({
+            id: trip.id,
+            title: trip.title,
+            budget: trip.estimated_budget_text || null,
+          }))
+        );
+      } catch (error) {
+        setTrips([]);
+      }
+    };
+
+    loadTrips();
+  }, []);
+
+  useEffect(() => {
+    const loadBadges = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+      const { data, error } = await supabase
+        .from("user_badges")
+        .select("badge:badges(id,label)")
+        .eq("user_id", userData.user.id);
+      if (!error && data) {
+        setBadges(
+          data
+            .map((row: any) => row.badge)
+            .filter(Boolean)
+            .map((badge: any) => ({ id: badge.id, label: badge.label }))
+        );
+      } else {
+        setBadges([]);
+      }
+    };
+
+    loadBadges();
+  }, []);
+
+  useEffect(() => {
+    const loadFriendsAndFollowers = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+      const { data, error } = await supabase
+        .from("follows")
+        .select("following_id")
+        .eq("follower_id", userData.user.id);
+      if (error || !data) {
+        setFriends([]);
+      } else {
+        const profiles = await getProfilesByIds(
+          data.map((row: any) => row.following_id)
+        );
+        setFriends(
+          profiles.map((profile) => ({
+            id: profile.id,
+            name: profile.full_name || profile.username || "Sin nombre",
+          }))
+        );
+      }
+
+      const { count } = await supabase
+        .from("follows")
+        .select("*", { count: "exact", head: true })
+        .eq("following_id", userData.user.id);
+      setFollowersCount(count || 0);
+    };
+
+    loadFriendsAndFollowers();
+  }, []);
+
+  useEffect(() => {
+    const loadLikesCount = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+      const { data, error } = await supabase
+        .from("trips")
+        .select("id")
+        .eq("owner_id", userData.user.id);
+      if (error || !data || data.length === 0) {
+        setLikesCount(0);
+        return;
+      }
+      const tripIds = data.map((row: any) => row.id);
+      const { count } = await supabase
+        .from("trip_likes")
+        .select("*", { count: "exact", head: true })
+        .in("trip_id", tripIds);
+      setLikesCount(count || 0);
+    };
+
+    loadLikesCount();
+  }, []);
+
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -186,17 +293,17 @@ export default function ProfileScreen({
 
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>72.9K</Text>
+                <Text style={styles.statValue}>{likesCount}</Text>
                 <Text style={styles.statLabel}>Likes</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>828</Text>
+                <Text style={styles.statValue}>{trips.length}</Text>
                 <Text style={styles.statLabel}>Trips</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>342.9K</Text>
+                <Text style={styles.statValue}>{followersCount}</Text>
                 <Text style={styles.statLabel}>Followers</Text>
               </View>
             </View>

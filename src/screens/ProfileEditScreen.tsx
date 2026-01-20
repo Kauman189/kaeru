@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ArrowLeft } from "lucide-react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
 import { useProfile } from "../store/profileContext";
+import { supabase } from "../lib/supabase";
 import styles from "./ProfileEditScreen.styles";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProfileEdit">;
@@ -21,22 +22,81 @@ export default function ProfileEditScreen({ navigation }: Props) {
   const [pronouns, setPronouns] = useState(profile.pronouns);
   const [bio, setBio] = useState(profile.bio);
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+      const { data, error: profileError } = await supabase
+        .from("profiles")
+        .select("full_name,username,avatar_url,location,gender,pronouns,bio")
+        .eq("id", userData.user.id)
+        .single();
+      if (profileError || !data) return;
+      setName(data.full_name || data.username || "");
+      setLocation(data.location || "");
+      setGender(data.gender || "");
+      setPronouns(data.pronouns || "");
+      setBio(data.bio || "");
+    };
+
+    loadProfile();
+  }, []);
 
   const canSave = useMemo(() => {
     return name.trim().length > 0 && location.trim().length > 0 && pronouns.trim().length > 0;
   }, [location, name, pronouns]);
 
-  const handleSave = () => {
-    completeProfile({
-      name,
-      email,
-      location,
-      gender,
-      pronouns,
-      bio,
-      password,
-    });
-    navigation.goBack();
+  const handleSave = async () => {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
+        setError("Debes iniciar sesion para guardar.");
+        return;
+      }
+      const { error: upsertError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: userData.user.id,
+          full_name: name,
+          location,
+          gender,
+          pronouns,
+          bio,
+          profile_complete: true,
+          updated_at: new Date().toISOString(),
+        });
+      if (upsertError) {
+        setError(upsertError.message);
+        return;
+      }
+
+      if (password.trim().length > 0) {
+        const { error: passError } = await supabase.auth.updateUser({
+          password,
+        });
+        if (passError) {
+          setError(passError.message);
+          return;
+        }
+      }
+
+      completeProfile({
+        name,
+        email,
+        location,
+        gender,
+        pronouns,
+        bio,
+      });
+      navigation.goBack();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -177,14 +237,20 @@ export default function ProfileEditScreen({ navigation }: Props) {
 
         <View style={styles.footerRow}>
           <TouchableOpacity
-            style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
+            style={[
+              styles.saveButton,
+              (!canSave || isSubmitting) && styles.saveButtonDisabled,
+            ]}
             onPress={handleSave}
-            disabled={!canSave}
+            disabled={!canSave || isSubmitting}
             accessibilityRole="button"
           >
-            <Text style={styles.saveButtonText}>Save changes</Text>
+            <Text style={styles.saveButtonText}>
+              {isSubmitting ? "Guardando..." : "Guardar cambios"}
+            </Text>
           </TouchableOpacity>
         </View>
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </ScrollView>
     </SafeAreaView>
   );

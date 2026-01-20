@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
 import { useProfile } from "../store/profileContext";
+import { supabase } from "../lib/supabase";
 import styles from "./ProfileSetupScreen.styles";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProfileSetup">;
@@ -20,6 +21,8 @@ export default function ProfileSetupScreen({ navigation }: Props) {
   const [gender, setGender] = useState(profile.gender);
   const [pronouns, setPronouns] = useState(profile.pronouns);
   const [bio, setBio] = useState(profile.bio);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const canContinue = useMemo(() => {
     if (step === 1) {
@@ -28,13 +31,45 @@ export default function ProfileSetupScreen({ navigation }: Props) {
     return true;
   }, [location, name, pronouns, step]);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 1) {
       setStep(2);
       return;
     }
-    completeProfile({ name, location, gender, pronouns, bio });
-    navigation.goBack();
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
+        setError("Sign in to update your profile.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const { error: upsertError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: userData.user.id,
+          full_name: name,
+          location,
+          gender,
+          pronouns,
+          bio,
+          profile_complete: true,
+          updated_at: new Date().toISOString(),
+        });
+
+      if (upsertError) {
+        setError(upsertError.message);
+        setIsSubmitting(false);
+        return;
+      }
+
+      completeProfile({ name, location, gender, pronouns, bio });
+      navigation.goBack();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -157,6 +192,8 @@ export default function ProfileSetupScreen({ navigation }: Props) {
         )}
       </View>
 
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.secondaryButton, step === 1 && styles.secondaryButtonDisabled]}
@@ -167,12 +204,17 @@ export default function ProfileSetupScreen({ navigation }: Props) {
           <Text style={styles.secondaryText}>Back</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.primaryButton, !canContinue && styles.primaryButtonDisabled]}
+          style={[
+            styles.primaryButton,
+            (!canContinue || isSubmitting) && styles.primaryButtonDisabled,
+          ]}
           onPress={handleNext}
-          disabled={!canContinue}
+          disabled={!canContinue || isSubmitting}
           accessibilityRole="button"
         >
-          <Text style={styles.primaryText}>{step === 1 ? "Continue" : "Finish"}</Text>
+          <Text style={styles.primaryText}>
+            {isSubmitting ? "Saving..." : step === 1 ? "Continue" : "Finish"}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

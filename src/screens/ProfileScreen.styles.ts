@@ -174,6 +174,10 @@ const styles = StyleSheet.create({
   sectionContent: {
     marginTop: 16,
   },
+  sectionEmpty: {
+    fontSize: 12,
+    color: "#6B7280",
+  },
   tripCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 18,

@@ -8,23 +8,63 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ArrowLeft } from "lucide-react-native";
 import { RootStackParamList } from "../navigation/RootNavigator";
+import { supabase } from "../lib/supabase";
 import { useProfile } from "../store/profileContext";
 import styles from "./AuthScreen.styles";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Auth">;
 
 export default function AuthScreen({ navigation }: Props) {
-  const { setNeedsProfileSetup, updateProfile } = useProfile();
+  const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { setNeedsProfileSetup } = useProfile();
 
-  const handleContinue = () => {
-    updateProfile({ email, password });
-    setNeedsProfileSetup(true);
-    navigation.reset({
-      index: 0,
-      routes: [{ name: "Tabs" }],
-    });
+  const handleSubmit = async () => {
+    if (!email.trim() || !password.trim()) {
+      setError("Email and password are required.");
+      return;
+    }
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      if (mode === "register") {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (signUpError) {
+          setError(signUpError.message);
+          return;
+        }
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) {
+          setError(signInError.message);
+          return;
+        }
+        setNeedsProfileSetup(true);
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) {
+          setError(signInError.message);
+          return;
+        }
+      }
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Tabs" }],
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -40,7 +80,9 @@ export default function AuthScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.title}>Iniciar sesion o registrarse</Text>
+        <Text style={styles.title}>
+          {mode === "login" ? "Iniciar sesion" : "Crear cuenta"}
+        </Text>
         <Text style={styles.subtitle}>
           Accede para guardar tus viajes, colaborar y mantener tus planes.
         </Text>
@@ -73,9 +115,32 @@ export default function AuthScreen({ navigation }: Props) {
         <TouchableOpacity
           style={styles.primaryButton}
           accessibilityRole="button"
-          onPress={handleContinue}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
         >
-          <Text style={styles.primaryButtonText}>Continuar</Text>
+          <Text style={styles.primaryButtonText}>
+            {isSubmitting
+              ? "Procesando..."
+              : mode === "login"
+              ? "Entrar"
+              : "Crear cuenta"}
+          </Text>
+        </TouchableOpacity>
+
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+        <TouchableOpacity
+          style={styles.modeToggle}
+          onPress={() =>
+            setMode((prev) => (prev === "login" ? "register" : "login"))
+          }
+          accessibilityRole="button"
+        >
+          <Text style={styles.modeToggleText}>
+            {mode === "login"
+              ? "No tienes cuenta? Crear una"
+              : "Ya tienes cuenta? Inicia sesion"}
+          </Text>
         </TouchableOpacity>
 
         <View style={styles.separatorRow}>

@@ -129,6 +129,12 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     paddingTop: 12,
   },
+  errorText: {
+    marginTop: 6,
+    paddingHorizontal: 20,
+    fontSize: 12,
+    color: "#DC2626",
+  },
   secondaryButton: {
     flex: 1,
     paddingVertical: 14,
