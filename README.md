@@ -4,7 +4,7 @@
 
 Kaeru es una aplicación móvil iOS-first para planificar viajes, compartirlos con colaboradores y ejecutar un "viaje activo" con recordatorios y seguimiento del itinerario.
 
-Este README está escrito para defensa TFG. Explica:
+Este README explica:
 
 - qué hace el sistema,
 - por qué está diseñado así,
@@ -284,7 +284,7 @@ A fecha de hoy el proyecto está en estado de demo funcional:
 - viaje activo funcional,
 - documentación técnica preparada para explicar decisiones.
 
-## 12) Próximos pasos (post-TFG)
+## 12) Próximos pasos (post-Defensa)
 
 1. Sustituir catálogo local por proveedor de lugares global con coste controlado.
 2. Añadir push remota (APNs) sobre notificaciones locales actuales.
