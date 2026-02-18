@@ -1,4 +1,4 @@
-# Kaeru - Memoria técnica de desarrollo (TFG)
+# Kaeru - Memoria técnica de desarroll
 
 ## 1) Qué es este trabajo
 Kaeru es una aplicación móvil iOS-first para planificar viajes, compartirlos con colaboradores y ejecutar un "viaje activo" con recordatorios y seguimiento del itinerario.
