@@ -1,26 +1,50 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, TouchableOpacity, View } from "react-native";
 import PagerView from "react-native-pager-view";
+import { LinearGradient } from "expo-linear-gradient";
 import { Briefcase, Globe, User } from "lucide-react-native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import HomeScreen from "./HomeScreen";
 import MyTripsScreen from "./MyTripsScreen";
 import ProfileScreen from "./ProfileScreen";
 import styles from "./TabsPager.styles";
+import { RootStackParamList } from "../navigation/RootNavigator";
+import { supabase } from "../lib/supabase";
 
 const TAB_SIZE = 36;
 const TAB_GAP = 14;
 const TAB_PADDING = 14;
 const AnimatedPagerView = Animated.createAnimatedComponent(PagerView);
 
-export default function TabsPager() {
+type Props = NativeStackScreenProps<RootStackParamList, "Tabs">;
+
+export default function TabsPager({ navigation, route }: Props) {
   const pagerRef = useRef<PagerView>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [tabBarVisible, setTabBarVisible] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const barTranslate = useRef(new Animated.Value(0)).current;
   const barOpacity = useRef(new Animated.Value(1)).current;
   const pagerPosition = useRef(new Animated.Value(0)).current;
   const pagerOffset = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let mounted = true;
+    const loadAuthState = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (mounted) {
+        setIsAuthenticated(Boolean(data.user));
+      }
+    };
+    loadAuthState();
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(Boolean(session?.user));
+    });
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     Animated.parallel([
@@ -41,8 +65,29 @@ export default function TabsPager() {
 
   const setPage = (index: number) => {
     pagerRef.current?.setPage(index);
-    setActiveIndex(index);
     setTabBarVisible(true);
+  };
+
+  const setPageWithAuthGuard = (index: number) => {
+    if (index === 0) {
+      setPage(0);
+      return;
+    }
+    if (!isAuthenticated) {
+      navigation.navigate("Auth", {
+        redirectTo: index === 1 ? "my_trips" : "profile",
+      });
+      return;
+    }
+    setPage(index);
+  };
+
+  const handleOpenProfile = () => {
+    if (!isAuthenticated) {
+      navigation.navigate("Auth", { redirectTo: "profile" });
+      return;
+    }
+    setPage(2);
   };
 
   const indicatorTranslate = useMemo(() => {
@@ -79,14 +124,27 @@ export default function TabsPager() {
     return mixColor("#FFFFFF", "#1E1E1E", weight);
   };
 
+  useEffect(() => {
+    const targetTab = route.params?.targetTab;
+    if (!targetTab) return;
+    if (targetTab === "discover") {
+      setPage(0);
+    } else if (targetTab === "my_trips") {
+      setPage(1);
+    } else if (targetTab === "profile") {
+      setPage(2);
+    }
+    navigation.setParams({ targetTab: undefined });
+  }, [navigation, route.params?.targetTab]);
+
   return (
     <View style={styles.container}>
       <AnimatedPagerView
         ref={pagerRef}
         style={styles.pager}
         initialPage={0}
+        scrollEnabled={isAuthenticated}
         onPageSelected={(event) => {
-          setActiveIndex(event.nativeEvent.position);
           setScrollProgress(event.nativeEvent.position);
           setTabBarVisible(true);
         }}
@@ -94,7 +152,7 @@ export default function TabsPager() {
           [{ nativeEvent: { position: pagerPosition, offset: pagerOffset } }],
           {
             useNativeDriver: true,
-            listener: (event) => {
+            listener: (event: any) => {
               const { position, offset } = event.nativeEvent;
               setScrollProgress(position + offset);
             },
@@ -102,7 +160,10 @@ export default function TabsPager() {
         )}
       >
         <View key="home" style={{ flex: 1 }}>
-          <HomeScreen onTabBarVisibilityChange={setTabBarVisible} />
+          <HomeScreen
+            onTabBarVisibilityChange={setTabBarVisible}
+            onOpenProfile={handleOpenProfile}
+          />
         </View>
         <View key="my-trips" style={{ flex: 1 }}>
           <MyTripsScreen onTabBarVisibilityChange={setTabBarVisible} />
@@ -121,6 +182,22 @@ export default function TabsPager() {
           },
         ]}
       >
+        <LinearGradient
+          pointerEvents="none"
+          colors={["#2B2B2F", "#202124", "#17181A"]}
+          locations={[0, 0.45, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.tabBarGradient}
+        />
+        <LinearGradient
+          pointerEvents="none"
+          colors={["rgba(255,255,255,0.16)", "rgba(255,255,255,0.03)", "rgba(255,255,255,0)"]}
+          locations={[0, 0.35, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.tabBarGloss}
+        />
         <Animated.View
           pointerEvents="none"
           style={[
@@ -140,14 +217,14 @@ export default function TabsPager() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.tabItem}
-          onPress={() => setPage(1)}
+          onPress={() => setPageWithAuthGuard(1)}
           accessibilityRole="button"
         >
           <Briefcase size={20} color={getIconColor(1)} />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.tabItem}
-          onPress={() => setPage(2)}
+          onPress={() => setPageWithAuthGuard(2)}
           accessibilityRole="button"
         >
           <User size={20} color={getIconColor(2)} />

@@ -23,6 +23,11 @@ const styles = StyleSheet.create({
   headerLeft: {
     flex: 1,
   },
+  headerRightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
   title: {
     fontSize: 28,
     fontWeight: "700",
@@ -38,6 +43,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   inviteButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inviteButtonDisabled: {
+    backgroundColor: "#F9FAFB",
+  },
+  activeTripsButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -69,6 +85,56 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingHorizontal: 20,
   },
+  filterButton: {
+    position: "relative",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+  },
+  filterBadge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    backgroundColor: "#1D4ED8",
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterBadgeText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  toggleWrap: {
+    flexDirection: "row",
+    backgroundColor: "#F3F4F6",
+    borderRadius: 999,
+    padding: 4,
+    gap: 4,
+  },
+  toggleButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  toggleButtonActive: {
+    backgroundColor: "#1E1E1E",
+  },
+  toggleText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6B7280",
+  },
+  toggleTextActive: {
+    color: "#FFFFFF",
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
@@ -87,6 +153,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6B7280",
     lineHeight: 20,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+  },
+  filterChipPeople: {
+    backgroundColor: "#FEF9C3",
+  },
+  filterChipTourism: {
+    backgroundColor: "#DBEAFE",
+  },
+  filterChipFood: {
+    backgroundColor: "#FFE4E6",
+  },
+  filterChipDefault: {
+    backgroundColor: "#FFFFFF",
+  },
+  filterChipActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
+  filterText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  filterTextDark: {
+    color: "#111827",
+  },
+  filterTextMuted: {
+    color: "#4B5563",
+  },
+  filterTextActive: {
+    color: "#FFFFFF",
   },
   floatingAdd: {
     position: "absolute",
@@ -266,6 +368,78 @@ const styles = StyleSheet.create({
   },
   invitePrimaryText: {
     fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(17,24,39,0.25)",
+    justifyContent: "flex-end",
+  },
+  sheetOverlayTap: {
+    flex: 1,
+  },
+  sheetContainer: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 20,
+  },
+  sheetHandle: {
+    width: 42,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#D1D5DB",
+    alignSelf: "center",
+    marginBottom: 10,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  sheetSectionTitle: {
+    marginTop: 16,
+    marginBottom: 10,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#4B5563",
+  },
+  sheetChipsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  sheetActionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 20,
+  },
+  sheetSecondaryButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  sheetSecondaryText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  sheetPrimaryButton: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: "#1D4ED8",
+  },
+  sheetPrimaryText: {
+    fontSize: 13,
+    fontWeight: "700",
     color: "#FFFFFF",
   },
 });

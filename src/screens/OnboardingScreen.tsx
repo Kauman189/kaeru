@@ -9,11 +9,9 @@ import {
   View,
   ViewToken,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import PaginationDots from "../components/PaginationDots";
 import PrimaryButton from "../components/PrimaryButton";
-import TextButton from "../components/TextButton";
 import TripCardPreview from "../components/TripCardPreview";
 import { setOnboardingSeen } from "../storage/onboardingStorage";
 import { RootStackParamList } from "../navigation/RootNavigator";
@@ -27,7 +25,7 @@ type Slide = {
   image?: number;
 };
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
 const slides: Slide[] = [
   {
@@ -70,10 +68,6 @@ export default function OnboardingScreen({ navigation }: Props) {
   const viewabilityConfig = useRef({
     viewAreaCoveragePercentThreshold: 50,
   }).current;
-
-  const handleSkip = useCallback(() => {
-    listRef.current?.scrollToIndex({ index: 1, animated: true });
-  }, []);
 
   const handleCreateTrip = useCallback(() => {
     // TODO: Tras autenticar, persistir onboarding y reiniciar a Home.
@@ -142,7 +136,14 @@ export default function OnboardingScreen({ navigation }: Props) {
               <Text style={styles.slide2Subtitle}>{item.subtitle}</Text>
               
               <View style={styles.cardWithHand}>
-                <TripCardPreview onPress={() => navigation.navigate('TripDetail')} />
+                <TripCardPreview
+                  onPress={() =>
+                    navigation.navigate("TripDetail", {
+                      source: "discover",
+                      demoTrip: "onboarding",
+                    })
+                  }
+                />
                 <View style={styles.handIconContainer}>
                   <Text style={styles.handEmoji}>👆</Text>
                 </View>
@@ -200,16 +201,6 @@ export default function OnboardingScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-
-      {activeIndex === 0 && (
-        <SafeAreaView edges={['top']} style={styles.skipButtonContainer}>
-          <TextButton
-            label="Saltar"
-            onPress={handleSkip}
-            textStyle={styles.skipButtonText}
-          />
-        </SafeAreaView>
-      )}
 
       <FlatList
         ref={listRef}

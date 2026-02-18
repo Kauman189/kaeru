@@ -59,6 +59,70 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     textAlign: "center",
   },
+  stopsPanel: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 22,
+    maxHeight: 220,
+    backgroundColor: "rgba(255,255,255,0.96)",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
+  },
+  stopsTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 8,
+  },
+  stopsList: {
+    flexGrow: 0,
+  },
+  stopsListContent: {
+    gap: 8,
+    paddingBottom: 8,
+  },
+  stopRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  stopIndexBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#DCFCE7",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  stopIndexText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#166534",
+  },
+  stopInfo: {
+    flex: 1,
+  },
+  stopTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  stopTime: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#1D4ED8",
+  },
+  stopAddress: {
+    marginTop: 1,
+    fontSize: 12,
+    color: "#6B7280",
+  },
 });
 
 export default styles;

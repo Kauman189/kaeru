@@ -5,6 +5,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFFFFF",
   },
+  keyboardContainer: {
+    flex: 1,
+  },
+  body: {
+    flex: 1,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -46,13 +52,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E1E1E",
   },
   content: {
-    flex: 1,
     paddingHorizontal: 20,
+    paddingBottom: 24,
   },
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 16,
+    marginBottom: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
@@ -126,8 +133,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     paddingHorizontal: 20,
-    paddingBottom: 24,
-    paddingTop: 12,
+    paddingTop: 10,
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
   },
   errorText: {
     marginTop: 6,

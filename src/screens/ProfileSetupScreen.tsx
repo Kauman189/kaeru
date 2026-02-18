@@ -1,6 +1,16 @@
 import React, { useMemo, useState } from "react";
-import { Text, TextInput, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowLeft } from "lucide-react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
@@ -10,10 +20,11 @@ import styles from "./ProfileSetupScreen.styles";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProfileSetup">;
 
-const GENDER_OPTIONS = ["Woman", "Man", "Non-binary", "Prefer not to say"];
-const PRONOUN_OPTIONS = ["she/her", "he/him", "they/them", "Prefer not to say"];
+const GENDER_OPTIONS = ["Mujer", "Hombre", "No binario", "Prefiero no decirlo"];
+const PRONOUN_OPTIONS = ["ella", "él", "elle", "Prefiero no decirlo"];
 
 export default function ProfileSetupScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const { profile, completeProfile } = useProfile();
   const [step, setStep] = useState(1);
   const [name, setName] = useState(profile.name);
@@ -41,15 +52,41 @@ export default function ProfileSetupScreen({ navigation }: Props) {
     try {
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData.user) {
-        setError("Sign in to update your profile.");
+        setError("Inicia sesión para actualizar tu perfil.");
         setIsSubmitting(false);
         return;
       }
-
-      const { error: upsertError } = await supabase
+      const fallbackUsername = `user_${userData.user.id.slice(0, 8)}`;
+      const { data: existingProfile } = await supabase
         .from("profiles")
-        .upsert({
+        .select("id,username")
+        .eq("id", userData.user.id)
+        .maybeSingle();
+
+      if (existingProfile) {
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({
+            full_name: name,
+            location,
+            gender,
+            pronouns,
+            bio,
+            profile_complete: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", userData.user.id);
+        if (updateError) {
+          setError(updateError.message);
+          return;
+        }
+      } else {
+        const usernameFromMetadata =
+          (userData.user.user_metadata?.username as string | undefined)?.trim().toLowerCase() ||
+          fallbackUsername;
+        const { error: insertError } = await supabase.from("profiles").insert({
           id: userData.user.id,
+          username: usernameFromMetadata,
           full_name: name,
           location,
           gender,
@@ -58,11 +95,10 @@ export default function ProfileSetupScreen({ navigation }: Props) {
           profile_complete: true,
           updated_at: new Date().toISOString(),
         });
-
-      if (upsertError) {
-        setError(upsertError.message);
-        setIsSubmitting(false);
-        return;
+        if (insertError) {
+          setError(insertError.message);
+          return;
+        }
       }
 
       completeProfile({ name, location, gender, pronouns, bio });
@@ -74,149 +110,165 @@ export default function ProfileSetupScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-          accessibilityRole="button"
-        >
-          <ArrowLeft size={22} color="#1E1E1E" />
-        </TouchableOpacity>
-        <View>
-          <Text style={styles.stepLabel}>Step {step} of 2</Text>
-          <Text style={styles.title}>Complete your profile</Text>
+      <KeyboardAvoidingView
+        style={styles.keyboardContainer}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            accessibilityRole="button"
+          >
+            <ArrowLeft size={22} color="#1E1E1E" />
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.stepLabel}>Paso {step} de 2</Text>
+            <Text style={styles.title}>Completa tu perfil</Text>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: step === 1 ? "50%" : "100%" }]} />
-      </View>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: step === 1 ? "50%" : "100%" }]} />
+        </View>
 
-      <View style={styles.content}>
-        {step === 1 ? (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Basics</Text>
-            <Text style={styles.sectionSubtitle}>
-              Tell us how you want to appear in Kaeru.
-            </Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Name</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Your name"
-                placeholderTextColor="#9CA3AF"
-                value={name}
-                onChangeText={setName}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Location</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="City, country"
-                placeholderTextColor="#9CA3AF"
-                value={location}
-                onChangeText={setLocation}
-              />
-            </View>
-
-            <Text style={styles.inputLabel}>Gender</Text>
-            <View style={styles.optionRow}>
-              {GENDER_OPTIONS.map((option) => (
-                <TouchableOpacity
-                  key={option}
-                  onPress={() => setGender(option)}
-                  style={[
-                    styles.optionChip,
-                    gender === option && styles.optionChipActive,
-                  ]}
-                  accessibilityRole="button"
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      gender === option && styles.optionTextActive,
-                    ]}
-                  >
-                    {option}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={styles.body}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.content}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              onScrollBeginDrag={Keyboard.dismiss}
+            >
+              {step === 1 ? (
+                <View style={styles.card}>
+                  <Text style={styles.sectionTitle}>Datos básicos</Text>
+                  <Text style={styles.sectionSubtitle}>
+                    Cuéntanos cómo quieres aparecer en Kaeru.
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
 
-            <Text style={[styles.inputLabel, styles.optionLabel]}>Pronouns</Text>
-            <View style={styles.optionRow}>
-              {PRONOUN_OPTIONS.map((option) => (
-                <TouchableOpacity
-                  key={option}
-                  onPress={() => setPronouns(option)}
-                  style={[
-                    styles.optionChip,
-                    pronouns === option && styles.optionChipActive,
-                  ]}
-                  accessibilityRole="button"
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      pronouns === option && styles.optionTextActive,
-                    ]}
-                  >
-                    {option}
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Nombre</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Tu nombre"
+                      placeholderTextColor="#9CA3AF"
+                      value={name}
+                      onChangeText={setName}
+                      returnKeyType="next"
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Ubicación</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Ciudad, país"
+                      placeholderTextColor="#9CA3AF"
+                      value={location}
+                      onChangeText={setLocation}
+                    />
+                  </View>
+
+                  <Text style={styles.inputLabel}>Género</Text>
+                  <View style={styles.optionRow}>
+                    {GENDER_OPTIONS.map((option) => (
+                      <TouchableOpacity
+                        key={option}
+                        onPress={() => setGender(option)}
+                        style={[
+                          styles.optionChip,
+                          gender === option && styles.optionChipActive,
+                        ]}
+                        accessibilityRole="button"
+                      >
+                        <Text
+                          style={[
+                            styles.optionText,
+                            gender === option && styles.optionTextActive,
+                          ]}
+                        >
+                          {option}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text style={[styles.inputLabel, styles.optionLabel]}>Pronombres</Text>
+                  <View style={styles.optionRow}>
+                    {PRONOUN_OPTIONS.map((option) => (
+                      <TouchableOpacity
+                        key={option}
+                        onPress={() => setPronouns(option)}
+                        style={[
+                          styles.optionChip,
+                          pronouns === option && styles.optionChipActive,
+                        ]}
+                        accessibilityRole="button"
+                      >
+                        <Text
+                          style={[
+                            styles.optionText,
+                            pronouns === option && styles.optionTextActive,
+                          ]}
+                        >
+                          {option}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.card}>
+                  <Text style={styles.sectionTitle}>Sobre ti</Text>
+                  <Text style={styles.sectionSubtitle}>
+                    Comparte una bio corta para mostrar tu estilo de viaje.
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Biografía</Text>
+                    <TextInput
+                      style={[styles.input, styles.multiline]}
+                      placeholder="Describe qué tipo de viajes te gustan"
+                      placeholderTextColor="#9CA3AF"
+                      value={bio}
+                      onChangeText={setBio}
+                      multiline
+                    />
+                  </View>
+                </View>
+              )}
+            </ScrollView>
           </View>
-        ) : (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>About you</Text>
-            <Text style={styles.sectionSubtitle}>
-              Share a short bio so people understand your travel style.
+        </TouchableWithoutFeedback>
+
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+          <TouchableOpacity
+            style={[styles.secondaryButton, step === 1 && styles.secondaryButtonDisabled]}
+            onPress={() => setStep(1)}
+            disabled={step === 1}
+            accessibilityRole="button"
+          >
+            <Text style={styles.secondaryText}>Atrás</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.primaryButton,
+              (!canContinue || isSubmitting) && styles.primaryButtonDisabled,
+            ]}
+            onPress={handleNext}
+            disabled={!canContinue || isSubmitting}
+            accessibilityRole="button"
+          >
+            <Text style={styles.primaryText}>
+              {isSubmitting ? "Guardando..." : step === 1 ? "Continuar" : "Finalizar"}
             </Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Bio</Text>
-              <TextInput
-                style={[styles.input, styles.multiline]}
-                placeholder="Describe what kind of trips you love"
-                placeholderTextColor="#9CA3AF"
-                value={bio}
-                onChangeText={setBio}
-                multiline
-              />
-            </View>
-          </View>
-        )}
-      </View>
-
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.secondaryButton, step === 1 && styles.secondaryButtonDisabled]}
-          onPress={() => setStep(1)}
-          disabled={step === 1}
-          accessibilityRole="button"
-        >
-          <Text style={styles.secondaryText}>Back</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.primaryButton,
-            (!canContinue || isSubmitting) && styles.primaryButtonDisabled,
-          ]}
-          onPress={handleNext}
-          disabled={!canContinue || isSubmitting}
-          accessibilityRole="button"
-        >
-          <Text style={styles.primaryText}>
-            {isSubmitting ? "Saving..." : step === 1 ? "Continue" : "Finish"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

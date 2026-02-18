@@ -5,6 +5,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFFFFF",
   },
+  keyboardContainer: {
+    flex: 1,
+  },
   header: {
     paddingHorizontal: 20,
     paddingTop: 8,
@@ -18,7 +21,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 12,
   },

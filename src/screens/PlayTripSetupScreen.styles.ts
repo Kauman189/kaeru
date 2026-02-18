@@ -1,0 +1,86 @@
+import { StyleSheet } from "react-native";
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  safeArea: { flex: 1 },
+  content: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 28 },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F1F5F9",
+  },
+  title: { fontSize: 22, fontWeight: "700", color: "#0F172A" },
+  helper: { marginTop: 4, fontSize: 13, color: "#64748B", lineHeight: 19, marginBottom: 14 },
+  section: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: "#FFFFFF",
+    marginBottom: 12,
+  },
+  sectionTitle: { fontSize: 14, fontWeight: "700", color: "#111827", marginBottom: 10 },
+  row: { flexDirection: "row", gap: 8 },
+  option: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  optionActive: {
+    borderColor: "#1D4ED8",
+    backgroundColor: "#EFF6FF",
+  },
+  optionText: { fontSize: 13, fontWeight: "600", color: "#374151" },
+  optionTextActive: { color: "#1D4ED8" },
+  label: { fontSize: 12, color: "#6B7280", marginBottom: 6 },
+  input: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#111827",
+    marginBottom: 10,
+    backgroundColor: "#FFFFFF",
+  },
+  switchRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 6,
+  },
+  switchText: { fontSize: 13, color: "#374151", flex: 1, marginRight: 10 },
+  primaryButton: {
+    marginTop: 8,
+    borderRadius: 12,
+    backgroundColor: "#111827",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+  },
+  primaryButtonDisabled: {
+    backgroundColor: "#9CA3AF",
+  },
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  error: { marginTop: 8, fontSize: 12, color: "#B91C1C" },
+});
+
+export default styles;

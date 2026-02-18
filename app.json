@@ -2,6 +2,7 @@
   "expo": {
     "name": "kaeru",
     "slug": "kaeru",
+    "scheme": "kaeru",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,7 +14,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.kaeru.app",
+      "infoPlist": {
+        "NSUserNotificationsUsageDescription": "Kaeru usa notificaciones para avisarte de tu próximo plan durante Play Trip."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -25,6 +30,9 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-notifications"
+    ]
   }
 }

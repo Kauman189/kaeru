@@ -3,6 +3,7 @@
  */
 import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
+import type { LinkingOptions } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,36 +15,64 @@ import AuthScreen from "../screens/AuthScreen";
 import CreateTripScreen from "../screens/CreateTripScreen";
 import ProfileEditScreen from "../screens/ProfileEditScreen";
 import ProfileSetupScreen from "../screens/ProfileSetupScreen";
-import { getOnboardingSeen } from "../storage/onboardingStorage";
+import SettingsScreen from "../screens/SettingsScreen";
+import InviteResolverScreen from "../screens/InviteResolverScreen";
+import NotificationsScreen from "../screens/NotificationsScreen";
+import PlayTripSetupScreen from "../screens/PlayTripSetupScreen";
+import ActiveTripsScreen from "../screens/ActiveTripsScreen";
+import ActiveTripDetailScreen from "../screens/ActiveTripDetailScreen";
+import { supabase } from "../lib/supabase";
 import styles from "./RootNavigator.styles";
 
 export type RootStackParamList = {
   Onboarding: undefined;
-  Tabs: undefined;
-  CreateTrip: undefined;
-  TripDetail: { tripId?: string; source?: "my" | "discover" } | undefined;
-  TripMap: { tripId?: string } | undefined;
-  Auth: undefined;
+  Tabs: { targetTab?: "discover" | "my_trips" | "profile" } | undefined;
+  CreateTrip: { mode?: "create" | "edit"; tripId?: string } | undefined;
+  TripDetail:
+    | { tripId?: string; source?: "my" | "my_shared" | "discover"; demoTrip?: "onboarding" }
+    | undefined;
+  TripMap: { tripId?: string; demoTrip?: "onboarding" } | undefined;
+  Auth:
+    | {
+        redirectTo?: "my_trips" | "profile" | "create_trip" | "play_trip";
+        pendingInviteToken?: string;
+        playTripTripId?: string;
+        playTripSource?: "discover" | "my" | "my_shared";
+      }
+    | undefined;
+  InviteResolver: { token: string };
+  Notifications: undefined;
   ProfileEdit: undefined;
   ProfileSetup: undefined;
+  Settings: undefined;
+  PlayTripSetup: { tripId: string; source: "discover" | "my" | "my_shared" };
+  ActiveTrips: undefined;
+  ActiveTripDetail: { sessionId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: ["kaeru://"],
+  config: {
+    screens: {
+      InviteResolver: "invite/:token",
+      TripDetail: "trip/:tripId",
+    },
+  },
+};
 
 export default function RootNavigator() {
   const [isReady, setIsReady] = useState(false);
-  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
+  const [initialRouteName, setInitialRouteName] = useState<keyof RootStackParamList>("Onboarding");
 
   useEffect(() => {
     let isMounted = true;
 
     const loadState = async () => {
-      // Lee el estado persistido antes de renderizar la navegacion.
-      const seen = await getOnboardingSeen();
-      if (isMounted) {
-        setHasSeenOnboarding(seen);
-        setIsReady(true);
-      }
+      const { data } = await supabase.auth.getSession();
+      if (!isMounted) return;
+      setInitialRouteName(data.session?.user ? "Tabs" : "Onboarding");
+      setIsReady(true);
     };
 
     loadState();
@@ -64,11 +93,10 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={linking}>
       <Stack.Navigator
         screenOptions={{ headerShown: false }}
-        // TODO: Cambiar a hasSeenOnboarding ? "Home" : "Onboarding" en produccion
-        initialRouteName="Onboarding"
+        initialRouteName={initialRouteName}
       >
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="Tabs" component={TabsPager} />
@@ -96,6 +124,32 @@ export default function RootNavigator() {
         <Stack.Screen
           name="ProfileSetup"
           component={ProfileSetupScreen}
+          options={{ presentation: "modal" }}
+        />
+        <Stack.Screen
+          name="Settings"
+          component={SettingsScreen}
+          options={{ presentation: "modal" }}
+        />
+        <Stack.Screen name="InviteResolver" component={InviteResolverScreen} />
+        <Stack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{ presentation: "modal" }}
+        />
+        <Stack.Screen
+          name="PlayTripSetup"
+          component={PlayTripSetupScreen}
+          options={{ presentation: "modal" }}
+        />
+        <Stack.Screen
+          name="ActiveTrips"
+          component={ActiveTripsScreen}
+          options={{ presentation: "modal" }}
+        />
+        <Stack.Screen
+          name="ActiveTripDetail"
+          component={ActiveTripDetailScreen}
           options={{ presentation: "modal" }}
         />
       </Stack.Navigator>

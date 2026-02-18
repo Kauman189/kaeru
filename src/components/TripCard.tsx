@@ -1,7 +1,8 @@
 import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
-import { Tag, MapPinned, Users, Building2, Utensils, Image } from "lucide-react-native";
+import { View, Text, TouchableOpacity, Image as RNImage } from "react-native";
+import { Tag, MapPinned, Users, Building2, Utensils, Image as ImageIcon } from "lucide-react-native";
 import styles from "./TripCard.styles";
+import { toTagLabelEs } from "../utils/tagLabels";
 
 export type TripData = {
   id: string;
@@ -11,15 +12,15 @@ export type TripData = {
   tags: string[];
   imageUrl?: string;
   authorId?: string;
+  badge?: string;
 };
 
 type TripCardProps = {
   trip: TripData;
   onPress?: () => void;
-  showAuthor?: boolean;
 };
 
-export default function TripCard({ trip, onPress, showAuthor = false }: TripCardProps) {
+export default function TripCard({ trip, onPress }: TripCardProps) {
   const getTagVariant = (tag: string) => {
     const lower = tag.toLowerCase();
     if (lower.includes("friend") || lower.includes("people") || lower.includes("solo") || lower.includes("couple") || lower.includes("family")) {
@@ -63,14 +64,13 @@ export default function TripCard({ trip, onPress, showAuthor = false }: TripCard
       onPress={onPress}
       activeOpacity={0.8}
     >
-      {showAuthor && (
-        <View style={styles.authorAvatar}>
-          <Users size={16} color="#6B7280" />
-        </View>
-      )}
-      
       <View style={styles.content}>
         <View style={styles.info}>
+          {trip.badge ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{trip.badge}</Text>
+            </View>
+          ) : null}
           <Text style={styles.title}>{trip.title}</Text>
           
           <View style={styles.stats}>
@@ -87,6 +87,7 @@ export default function TripCard({ trip, onPress, showAuthor = false }: TripCard
           <View style={styles.tags}>
             {trip.tags.map((tag, index) => {
               const variant = getTagVariant(tag);
+              const displayTag = toTagLabelEs(tag);
               return (
                 <View
                   key={index}
@@ -105,7 +106,7 @@ export default function TripCard({ trip, onPress, showAuthor = false }: TripCard
                       variant === "default" ? styles.tagTextMuted : styles.tagTextDark,
                     ]}
                   >
-                    {tag}
+                    {displayTag}
                   </Text>
                 </View>
               );
@@ -114,9 +115,13 @@ export default function TripCard({ trip, onPress, showAuthor = false }: TripCard
         </View>
         
         <View style={styles.imageContainer}>
-          <View style={styles.imagePlaceholder}>
-            <Image size={32} color="#9CA3AF" />
-          </View>
+          {trip.imageUrl ? (
+            <RNImage source={{ uri: trip.imageUrl }} style={styles.imagePlaceholder} />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <ImageIcon size={32} color="#9CA3AF" />
+            </View>
+          )}
         </View>
       </View>
     </TouchableOpacity>

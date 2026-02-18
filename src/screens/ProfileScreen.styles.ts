@@ -8,6 +8,40 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  guestBlockedCard: {
+    marginHorizontal: 20,
+    marginTop: 14,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 16,
+    padding: 14,
+    backgroundColor: "#FFFFFF",
+  },
+  guestBlockedTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  guestBlockedText: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#4B5563",
+  },
+  guestBlockedButton: {
+    marginTop: 12,
+    alignSelf: "flex-start",
+    backgroundColor: "#111827",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  guestBlockedButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 13,
+  },
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 160,
@@ -29,6 +63,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#CFE2F3",
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+    overflow: "hidden",
+  },
+  coverImage: {
+    width: "100%",
+    height: "100%",
   },
   coverCloud: {
     position: "absolute",
@@ -58,6 +97,8 @@ const styles = StyleSheet.create({
   avatarWrap: {
     marginTop: -42,
     paddingHorizontal: 20,
+    position: "relative",
+    minHeight: 88,
   },
   avatar: {
     width: 86,
@@ -66,6 +107,24 @@ const styles = StyleSheet.create({
     backgroundColor: "#E5E7EB",
     borderWidth: 4,
     borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  settingsButton: {
+    position: "absolute",
+    right: 20,
+    top: 18,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -174,9 +233,36 @@ const styles = StyleSheet.create({
   sectionContent: {
     marginTop: 16,
   },
+  inlineErrorBox: {
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+  },
+  inlineErrorText: {
+    flex: 1,
+    color: "#991B1B",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  inlineErrorRetry: {
+    color: "#B91C1C",
+    fontSize: 12,
+    fontWeight: "700",
+  },
   sectionEmpty: {
     fontSize: 12,
     color: "#6B7280",
+  },
+  tripList: {
+    gap: 10,
   },
   tripCard: {
     backgroundColor: "#FFFFFF",
@@ -264,6 +350,16 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: "#E0F2FE",
     marginBottom: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  badgeIconImage: {
+    width: 30,
+    height: 30,
+  },
+  badgeEmoji: {
+    fontSize: 20,
   },
   badgeText: {
     fontSize: 12,

@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
+  Modal,
+  Pressable,
+  RefreshControl,
   Share,
   StatusBar,
   Text,
@@ -9,45 +12,78 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Mic, Plus, SlidersHorizontal, Share2, Send } from "lucide-react-native";
+import { Mic, Play, Plus, SlidersHorizontal, Share2 } from "lucide-react-native";
 import styles from "./MyTripsScreen.styles";
 import TripCard, { TripData } from "../components/TripCard";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
 import { supabase } from "../lib/supabase";
-import { getProfiles } from "../services/profiles.service";
 import {
-  getTripCollaborators,
+  createTripInviteLink,
+  getTripTags,
   getTripsByOwner,
-  inviteCollaborator,
-  removeCollaborator,
+  getTripsSharedWithUser,
+  SharedTripRecord,
+  TripRecord,
 } from "../services/trips.service";
+import { t } from "../i18n";
+import { toTagLabelEs } from "../utils/tagLabels";
+import { getCacheItem, setCacheItem } from "../storage/cacheStorage";
+import { track } from "../services/analytics.service";
+import AsyncStateView from "../components/AsyncStateView";
 
 type MyTripsScreenProps = {
   onTabBarVisibilityChange?: (visible: boolean) => void;
 };
 
+const TAG_FILTERS = [
+  "Solo",
+  "Couple",
+  "2-4 Friends",
+  "Family",
+  "City Tourism",
+  "Food Tour",
+  "Adventure",
+  "Cultural",
+  "Nature",
+];
+
+const BUDGET_FILTERS = [
+  t.discover.budgetLow,
+  t.discover.budgetMid,
+  t.discover.budgetHigh,
+] as const;
+
 export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScreenProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [trips, setTrips] = useState<TripData[]>([]);
+  const [ownedTrips, setOwnedTrips] = useState<TripData[]>([]);
+  const [sharedTrips, setSharedTrips] = useState<TripData[]>([]);
+  const [activeTab, setActiveTab] = useState<"owned" | "shared">("owned");
+  const [query, setQuery] = useState("");
+  const [appliedTags, setAppliedTags] = useState<string[]>([]);
+  const [appliedBudget, setAppliedBudget] = useState<string | null>(null);
+  const [draftTags, setDraftTags] = useState<string[]>([]);
+  const [draftBudget, setDraftBudget] = useState<string | null>(null);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [profiles, setProfiles] = useState<
-    { id: string; name: string; avatarUrl: string | null }[]
-  >([]);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [selectedTripCollaborators, setSelectedTripCollaborators] = useState<string[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [inviteVisible, setInviteVisible] = useState(false);
-  const [invitedIds, setInvitedIds] = useState<string[]>([]);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [generatedInviteUrl, setGeneratedInviteUrl] = useState<string | null>(null);
+  const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [cacheNotice, setCacheNotice] = useState<string | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
   const lastScrollY = useRef(0);
   const barVisibleRef = useRef(true);
-  const mockUsers = profiles.filter((profile) => profile.name.trim().length > 0);
 
   const tripCards = useMemo<TripData[]>(() => {
-    return trips;
-  }, [trips]);
+    return activeTab === "owned" ? ownedTrips : sharedTrips;
+  }, [activeTab, ownedTrips, sharedTrips]);
+
+  const shareUrl = generatedInviteUrl || "";
+  const activeFilterCount = appliedTags.length + (appliedBudget ? 1 : 0) + (query.trim() ? 1 : 0);
 
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -75,94 +111,219 @@ export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScree
     onTabBarVisibilityChange?.(true);
   }, [onTabBarVisibilityChange]);
 
-  useEffect(() => {
-    const loadTrips = async () => {
-      setIsLoading(true);
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
-        setTrips([]);
-        setIsLoading(false);
-        return;
-      }
-      setCurrentUserId(userData.user.id);
-      try {
-        const data = await getTripsByOwner(userData.user.id);
-        setTrips(
-          data.map((trip) => ({
-            id: trip.id,
-            title: trip.title,
-            price: trip.estimated_budget_text || "-",
-            points: "0 puntos",
-            tags: [],
-          }))
-        );
-      } catch (error) {
-        setTrips([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const loadTrips = React.useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    setCacheNotice(null);
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
+      setOwnedTrips([]);
+      setSharedTrips([]);
+      setIsLoading(false);
+      return;
+    }
+    try {
+      const [ownedData, sharedData] = await Promise.all([
+        getTripsByOwner(userData.user.id),
+        getTripsSharedWithUser(userData.user.id),
+      ]);
 
-    loadTrips();
+      const mapTripsToCards = async (
+        records: Array<TripRecord | SharedTripRecord>,
+        badge: "Mío" | "Compartido"
+      ) => {
+        const tagSets = await Promise.all(
+          records.map(async (trip) => {
+            try {
+              return await getTripTags(trip.id);
+            } catch (error) {
+              return [];
+            }
+          })
+        );
+        return records.map((trip, index) => ({
+          id: trip.id,
+          title: trip.title,
+          price: trip.estimated_budget_text || "-",
+          points: "0 puntos",
+          tags: tagSets[index] || [],
+          imageUrl: trip.cover_image_url || undefined,
+          badge:
+            badge === "Compartido"
+              ? `Compartido · ${
+                  (trip as SharedTripRecord).collab_role === "editor" ? "Editor" : "Lector"
+                }`
+              : badge,
+        }));
+      };
+
+      const [ownedCards, sharedCards] = await Promise.all([
+        mapTripsToCards(ownedData, "Mío"),
+        mapTripsToCards(sharedData, "Compartido"),
+      ]);
+
+      setOwnedTrips(ownedCards);
+      setSharedTrips(sharedCards);
+      await Promise.all([
+        setCacheItem(`cache_my_trips_owned_v1_${userData.user.id}`, ownedCards),
+        setCacheItem(`cache_my_trips_shared_v1_${userData.user.id}`, sharedCards),
+      ]);
+    } catch (error) {
+      const message = (error as any)?.message || "No se pudieron cargar los viajes.";
+      const [ownedCache, sharedCache] = await Promise.all([
+        getCacheItem<TripData[]>(`cache_my_trips_owned_v1_${userData.user.id}`),
+        getCacheItem<TripData[]>(`cache_my_trips_shared_v1_${userData.user.id}`),
+      ]);
+      const hasCache = Boolean((ownedCache?.payload?.length || 0) + (sharedCache?.payload?.length || 0));
+      if (hasCache) {
+        setOwnedTrips(ownedCache?.payload || []);
+        setSharedTrips(sharedCache?.payload || []);
+        setCacheNotice("Mostrando datos guardados por falta de conexión.");
+      } else {
+        setOwnedTrips([]);
+        setSharedTrips([]);
+        setLoadError(message);
+      }
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (!selectedTripId && trips.length > 0) {
-      setSelectedTripId(trips[0].id);
-    }
-  }, [selectedTripId, trips]);
+    loadTrips();
+  }, [loadTrips]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadTrips();
+    }, [loadTrips])
+  );
 
   useEffect(() => {
-    const loadProfiles = async () => {
-      try {
-        const data = await getProfiles();
-        setProfiles(
-          data
-            .filter((profile) => profile.id !== currentUserId)
-            .map((profile) => ({
-              id: profile.id,
-              name: (profile.full_name || profile.username || "").trim(),
-              avatarUrl: profile.avatar_url,
-            }))
-        );
-      } catch (error) {
-        setProfiles([]);
-      }
-    };
-
-    if (inviteVisible) {
-      loadProfiles();
+    if (!selectedTripId && ownedTrips.length > 0) {
+      setSelectedTripId(ownedTrips[0].id);
     }
-  }, [inviteVisible, currentUserId]);
+  }, [ownedTrips, selectedTripId]);
+
+  useEffect(() => {
+    setGeneratedInviteUrl(null);
+  }, [selectedTripId]);
+
+  useEffect(() => {
+    if (activeTab === "shared") {
+      setInviteVisible(false);
+    }
+  }, [activeTab]);
+
+  const getFilterVariant = (filter: string) => {
+    const lower = filter.toLowerCase();
+    if (
+      lower.includes("friend") ||
+      lower.includes("people") ||
+      lower.includes("solo") ||
+      lower.includes("couple") ||
+      lower.includes("family")
+    ) {
+      return "people";
+    }
+    if (lower.includes("food")) {
+      return "food";
+    }
+    if (
+      lower.includes("tourism") ||
+      lower.includes("city") ||
+      lower.includes("cultural") ||
+      lower.includes("adventure") ||
+      lower.includes("nature")
+    ) {
+      return "tourism";
+    }
+    return "default";
+  };
+
+  const parseBudget = (value: string) => {
+    const numeric = parseFloat(value.replace(",", ".").replace(/[^0-9.]/g, ""));
+    return Number.isFinite(numeric) ? numeric : null;
+  };
+
+  const toggleDraftTag = (tag: string) => {
+    setDraftTags((prev) => (prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag]));
+  };
+
+  const applyFilters = () => {
+    setAppliedTags(draftTags);
+    setAppliedBudget(draftBudget);
+    setIsFilterSheetOpen(false);
+  };
+
+  const clearFilters = () => {
+    setDraftTags([]);
+    setDraftBudget(null);
+    setAppliedTags([]);
+    setAppliedBudget(null);
+  };
+
+  const openFilters = () => {
+    setDraftTags(appliedTags);
+    setDraftBudget(appliedBudget);
+    setIsFilterSheetOpen(true);
+  };
+
+  const filteredTrips = tripCards.filter((trip) => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery) {
+      const translatedTags = trip.tags.map((tag) => toTagLabelEs(tag));
+      const searchable = `${trip.title} ${translatedTags.join(" ")} ${trip.tags.join(" ")}`.toLowerCase();
+      if (!searchable.includes(normalizedQuery)) {
+        return false;
+      }
+    }
+
+    if (appliedTags.length > 0) {
+      const tripTags = new Set(trip.tags.map((tag) => tag.toLowerCase()));
+      const hasSelectedTag = appliedTags.some((tag) => tripTags.has(tag.toLowerCase()));
+      if (!hasSelectedTag) {
+        return false;
+      }
+    }
+
+    if (appliedBudget) {
+      const amount = parseBudget(trip.price);
+      if (amount == null) return false;
+      if (appliedBudget === t.discover.budgetLow && !(amount < 300)) return false;
+      if (appliedBudget === t.discover.budgetMid && !(amount >= 300 && amount <= 600)) return false;
+      if (appliedBudget === t.discover.budgetHigh && !(amount > 600)) return false;
+    }
+
+    return true;
+  });
 
   const handleShareTrip = async () => {
     if (!selectedTripId) return;
-    const trip = trips.find((item) => item.id === selectedTripId);
-    const shareUrl = `https://kaeru.app/invite?trip=${selectedTripId}`;
-    const message = `Te invito a colaborar en "${trip?.title || "Kaeru trip"}": ${shareUrl}`;
+    const trip = ownedTrips.find((item) => item.id === selectedTripId);
+    setIsGeneratingInvite(true);
     try {
-      await Share.share({ message, url: shareUrl });
-    } catch (error) {
-      // Ignore share errors for now.
+      const invite = await createTripInviteLink(selectedTripId, "editor");
+      const url = `kaeru://invite/${invite.invite_token}`;
+      const message = `Te invito a este viaje: "${trip?.title || "Viaje en Kaeru"}"\n${url}`;
+      setGeneratedInviteUrl(url);
+      await track("trip_share_link_created", { trip_id: selectedTripId });
+      await Share.share({ message, url });
+    } catch {
+      // ignore
+    } finally {
+      setIsGeneratingInvite(false);
     }
   };
 
-  useEffect(() => {
-    const loadCollaborators = async () => {
-      if (!selectedTripId) {
-        setSelectedTripCollaborators([]);
-        return;
-      }
-      try {
-        const data = await getTripCollaborators(selectedTripId);
-        setSelectedTripCollaborators(data.map((item) => item.user_id));
-      } catch (error) {
-        setSelectedTripCollaborators([]);
-      }
-    };
-
-    loadCollaborators();
-  }, [selectedTripId]);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadTrips();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -173,60 +334,121 @@ export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScree
           contentContainerStyle={styles.scrollContent}
           onScroll={handleScroll}
           scrollEventThrottle={16}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
+          }
         >
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <Text style={styles.title}>Let's plan your</Text>
-              <Text style={styles.title}>next trip</Text>
+              <Text style={styles.title}>Planifica tu</Text>
+              <Text style={styles.title}>siguiente viaje</Text>
             </View>
-            <TouchableOpacity
-              style={styles.inviteButton}
-              onPress={() => setInviteVisible(true)}
-              accessibilityRole="button"
-            >
-              <Share2 size={22} color="#1E1E1E" />
-            </TouchableOpacity>
+            <View style={styles.headerRightActions}>
+              <TouchableOpacity
+                style={styles.activeTripsButton}
+                onPress={() => navigation.navigate("ActiveTrips")}
+                accessibilityRole="button"
+              >
+                <Play size={20} color="#1E1E1E" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.inviteButton,
+                  activeTab === "shared" && styles.inviteButtonDisabled,
+                ]}
+                onPress={() => activeTab === "owned" && setInviteVisible(true)}
+                accessibilityRole="button"
+                disabled={activeTab === "shared"}
+              >
+                <Share2 size={22} color={activeTab === "shared" ? "#9CA3AF" : "#1E1E1E"} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.searchContainer}>
             <TextInput
               style={styles.searchInput}
-              placeholder="Search preffer destination"
+              placeholder="Buscar destino o viaje"
               placeholderTextColor="#9CA3AF"
+              value={query}
+              onChangeText={setQuery}
             />
             <Mic size={20} color="#9CA3AF" />
           </View>
 
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>My trips</Text>
-            <TouchableOpacity accessibilityRole="button">
-              <SlidersHorizontal size={20} color="#4B5563" />
+            <View style={styles.toggleWrap}>
+              <TouchableOpacity
+                style={[styles.toggleButton, activeTab === "owned" && styles.toggleButtonActive]}
+                onPress={() => setActiveTab("owned")}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.toggleText, activeTab === "owned" && styles.toggleTextActive]}>
+                  Míos
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleButton, activeTab === "shared" && styles.toggleButtonActive]}
+                onPress={() => setActiveTab("shared")}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.toggleText, activeTab === "shared" && styles.toggleTextActive]}>
+                  Compartidos
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.filterButton} onPress={openFilters} accessibilityRole="button">
+              <SlidersHorizontal size={20} color="#2563EB" />
+              {activeFilterCount > 0 && (
+                <View style={styles.filterBadge}>
+                  <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
           <View style={styles.sectionDivider} />
 
           {isLoading ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>Cargando tus viajes...</Text>
-            </View>
+            <AsyncStateView isLoading loadingText="Cargando tus viajes..." />
+          ) : loadError ? (
+            <AsyncStateView
+              isLoading={false}
+              error={loadError}
+              onRetry={() => loadTrips()}
+            />
           ) : tripCards.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>
-                Actualmente no tienes viajes.{"\n"}Crea uno con el boton +.
-              </Text>
-            </View>
+            <AsyncStateView
+              isLoading={false}
+              isEmpty
+              emptyText={activeTab === "owned" ? "No tienes viajes propios." : "No tienes viajes compartidos."}
+            />
+          ) : filteredTrips.length === 0 ? (
+            <AsyncStateView
+              isLoading={false}
+              isEmpty
+              emptyText="No hay viajes que coincidan con tus filtros."
+            />
           ) : (
-            tripCards.map((trip, index) => (
-              <TripCard
-                key={trip.id}
-                trip={trip}
-                showAuthor={index === 0}
-                onPress={() =>
-                  navigation.navigate("TripDetail", { tripId: trip.id, source: "my" })
-                }
-              />
-            ))
+            <>
+              {cacheNotice ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>{cacheNotice}</Text>
+                </View>
+              ) : null}
+              {filteredTrips.map((trip) => (
+                <TripCard
+                  key={trip.id}
+                  trip={trip}
+                  onPress={() =>
+                    navigation.navigate("TripDetail", {
+                      tripId: trip.id,
+                      source: activeTab === "owned" ? "my" : "my_shared",
+                    })
+                  }
+                />
+              ))}
+            </>
           )}
         </Animated.ScrollView>
       </SafeAreaView>
@@ -234,7 +456,14 @@ export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScree
       <TouchableOpacity
         style={styles.floatingAdd}
         accessibilityRole="button"
-        onPress={() => navigation.navigate("CreateTrip")}
+        onPress={async () => {
+          const { data } = await supabase.auth.getUser();
+          if (!data.user) {
+            navigation.navigate("Auth", { redirectTo: "create_trip" });
+            return;
+          }
+          navigation.navigate("CreateTrip");
+        }}
       >
         <Plus size={28} color="#fcfcfc" />
       </TouchableOpacity>
@@ -242,13 +471,14 @@ export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScree
       {inviteVisible && (
         <View style={styles.inviteOverlay}>
           <View style={styles.inviteCard}>
-            <Text style={styles.inviteTitle}>Invite collaborators</Text>
+            <Text style={styles.inviteTitle}>Invitar con enlace</Text>
             <Text style={styles.inviteSubtitle}>
-              Choose who can edit this trip with you.
+              Comparte este enlace para que otras personas puedan acceder al viaje.
             </Text>
-            {trips.length > 0 ? (
+
+            {ownedTrips.length > 0 ? (
               <View style={styles.inviteTripSelector}>
-                {trips.map((trip) => {
+                {ownedTrips.map((trip) => {
                   const active = trip.id === selectedTripId;
                   return (
                     <TouchableOpacity
@@ -276,103 +506,20 @@ export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScree
             ) : (
               <View style={styles.inviteEmpty}>
                 <Text style={styles.inviteEmptyText}>
-                  Crea un viaje antes de invitar colaboradores.
+                  Crea un viaje antes de compartir enlaces.
                 </Text>
               </View>
             )}
-            {selectedTripCollaborators.length > 0 && (
-              <View style={styles.inviteCurrent}>
-                <Text style={styles.inviteCurrentTitle}>Invitados actuales</Text>
-                <View style={styles.inviteCurrentList}>
-                  {mockUsers
-                    .filter((user) => selectedTripCollaborators.includes(user.id))
-                    .map((user) => (
-                      <View key={user.id} style={styles.inviteCurrentItem}>
-                        <View style={styles.inviteAvatar}>
-                          <Text style={styles.inviteAvatarText}>
-                            {user.name
-                              .split(" ")
-                              .slice(0, 2)
-                              .map((chunk) => chunk[0])
-                              .join("")
-                              .toUpperCase()}
-                          </Text>
-                        </View>
-                        <Text style={styles.inviteName}>{user.name}</Text>
-                        <Text style={styles.inviteStatus}>Invitado</Text>
-                      </View>
-                    ))}
-                </View>
+
+            {selectedTripId ? (
+              <View style={styles.inviteEmpty}>
+                <Text style={styles.inviteCurrentTitle}>Enlace generado</Text>
+                <Text style={styles.inviteEmptyText}>
+                  {isGeneratingInvite ? "Generando enlace seguro..." : shareUrl || "Pulsa \"Compartir enlace\""}
+                </Text>
               </View>
-            )}
-            {trips.length > 0 && (
-              <View style={styles.inviteList}>
-                {mockUsers.length === 0 ? (
-                  <Text style={styles.inviteEmptyText}>
-                    No hay usuarios disponibles para invitar.
-                  </Text>
-                ) : (
-                  mockUsers.map((user) => {
-                    const invited = invitedIds.includes(user.id);
-                    const assigned = selectedTripCollaborators.includes(user.id);
-                    return (
-                      <View key={user.id} style={styles.inviteRow}>
-                        <View
-                          style={[
-                            styles.inviteAvatar,
-                            { backgroundColor: "#E5E7EB" },
-                          ]}
-                        >
-                          <Text style={styles.inviteAvatarText}>
-                            {user.name
-                              .split(" ")
-                              .slice(0, 2)
-                              .map((chunk) => chunk[0])
-                              .join("")
-                              .toUpperCase()}
-                          </Text>
-                        </View>
-                        <Text style={styles.inviteName}>{user.name}</Text>
-                        <TouchableOpacity
-                          style={[
-                            styles.inviteAction,
-                            (invited || assigned) && styles.inviteActionActive,
-                          ]}
-                          onPress={() => {
-                            if (!selectedTripId) return;
-                            if (assigned) {
-                              removeCollaborator(selectedTripId, user.id);
-                              setSelectedTripCollaborators((prev) =>
-                                prev.filter((id) => id !== user.id)
-                              );
-                              return;
-                            }
-                            inviteCollaborator(selectedTripId, user.id);
-                            setInvitedIds((prev) =>
-                              prev.includes(user.id) ? prev : [...prev, user.id]
-                            );
-                          }}
-                          accessibilityRole="button"
-                        >
-                          <Send
-                            size={14}
-                            color={invited || assigned ? "#FFFFFF" : "#1E1E1E"}
-                          />
-                          <Text
-                            style={[
-                              styles.inviteActionText,
-                              (invited || assigned) && styles.inviteActionTextActive,
-                            ]}
-                          >
-                            {assigned ? "Eliminar" : invited ? "Enviado" : "Invitar"}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  })
-                )}
-              </View>
-            )}
+            ) : null}
+
             <View style={styles.inviteActionsRow}>
               <TouchableOpacity
                 style={styles.inviteSecondary}
@@ -385,13 +532,83 @@ export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScree
                 style={styles.invitePrimary}
                 onPress={handleShareTrip}
                 accessibilityRole="button"
+                disabled={!selectedTripId}
               >
-                <Text style={styles.invitePrimaryText}>Invitar con link</Text>
+                <Text style={styles.invitePrimaryText}>Compartir enlace</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       )}
+
+      <Modal visible={isFilterSheetOpen} transparent animationType="slide" onRequestClose={() => setIsFilterSheetOpen(false)}>
+        <View style={styles.sheetBackdrop}>
+          <Pressable style={styles.sheetOverlayTap} onPress={() => setIsFilterSheetOpen(false)} />
+          <View style={styles.sheetContainer}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>{t.discover.filtersTitle}</Text>
+
+            <Text style={styles.sheetSectionTitle}>{t.discover.filtersTripType}</Text>
+            <View style={styles.sheetChipsWrap}>
+              {TAG_FILTERS.map((filter) => {
+                const active = draftTags.includes(filter);
+                return (
+                  <TouchableOpacity
+                    key={filter}
+                    style={[
+                      styles.filterChip,
+                      getFilterVariant(filter) === "people" && styles.filterChipPeople,
+                      getFilterVariant(filter) === "tourism" && styles.filterChipTourism,
+                      getFilterVariant(filter) === "food" && styles.filterChipFood,
+                      getFilterVariant(filter) === "default" && styles.filterChipDefault,
+                      active && styles.filterChipActive,
+                    ]}
+                    onPress={() => toggleDraftTag(filter)}
+                  >
+                    <Text
+                      style={[
+                        styles.filterText,
+                        getFilterVariant(filter) === "default" ? styles.filterTextMuted : styles.filterTextDark,
+                        active && styles.filterTextActive,
+                      ]}
+                    >
+                      {toTagLabelEs(filter)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.sheetSectionTitle}>{t.discover.filtersBudget}</Text>
+            <View style={styles.sheetChipsWrap}>
+              {BUDGET_FILTERS.map((filter) => {
+                const active = draftBudget === filter;
+                return (
+                  <TouchableOpacity
+                    key={filter}
+                    style={[styles.filterChip, styles.filterChipDefault, active && styles.filterChipActive]}
+                    onPress={() => setDraftBudget((prev) => (prev === filter ? null : filter))}
+                  >
+                    <Text style={[styles.filterText, styles.filterTextMuted, active && styles.filterTextActive]}>{filter}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.sheetActionsRow}>
+              <TouchableOpacity style={styles.sheetSecondaryButton} onPress={clearFilters}>
+                <Text style={styles.sheetSecondaryText}>{t.discover.filtersClear}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sheetSecondaryButton} onPress={() => setIsFilterSheetOpen(false)}>
+                <Text style={styles.sheetSecondaryText}>{t.discover.filtersClose}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sheetPrimaryButton} onPress={applyFilters}>
+                <Text style={styles.sheetPrimaryText}>{t.discover.filtersApply}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
