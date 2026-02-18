@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -37,6 +39,14 @@ import { track } from "../services/analytics.service";
 import styles from "./CreateTripScreen.styles";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CreateTrip">;
+type TimePickerTarget = { type: "manual" } | { type: "stop"; stopId: string };
+
+let NativeDateTimePicker: any = null;
+try {
+  NativeDateTimePicker = require("@react-native-community/datetimepicker").default;
+} catch {
+  NativeDateTimePicker = null;
+}
 
 const TAGS = [
   { value: "City Tourism", label: "Turismo urbano" },
@@ -48,6 +58,8 @@ const TAGS = [
   { value: "Couple", label: "En pareja" },
   { value: "2-4 Friends", label: "2-4 amigos" },
 ];
+
+const BUDGET_PRESETS = ["150 €", "300 €", "500 €", "800 €", "1200 €"];
 
 const INITIAL_REGION: Region = {
   latitude: 39.4699,
@@ -85,6 +97,9 @@ export default function CreateTripScreen({ navigation, route }: Props) {
   const [stopAddress, setStopAddress] = useState("");
   const [stopTime, setStopTime] = useState("");
   const [stopPrice, setStopPrice] = useState("");
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const [timePickerTarget, setTimePickerTarget] = useState<TimePickerTarget | null>(null);
+  const [pickerDate, setPickerDate] = useState<Date>(new Date());
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(isEditMode);
@@ -105,6 +120,22 @@ export default function CreateTripScreen({ navigation, route }: Props) {
       return acc + (Number.isNaN(value) ? 0 : value);
     }, 0);
   }, [stops]);
+
+  const sanitizeMoneyInput = (value: string) => {
+    return value
+      .replace(/[^\d.,€\s]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  const formatEuroValue = (value: string) => {
+    const raw = sanitizeMoneyInput(value).replace("€", "").trim();
+    if (!raw) return "";
+    const numeric = Number(raw.replace(",", "."));
+    if (!Number.isFinite(numeric)) return sanitizeMoneyInput(value);
+    const rounded = Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(2).replace(".", ",");
+    return `${rounded} €`;
+  };
 
   const availableTags = useMemo(
     () => Array.from(new Set([...TAGS.map((tag) => tag.value), ...selectedTags])),
@@ -264,7 +295,7 @@ export default function CreateTripScreen({ navigation, route }: Props) {
           latitudeDelta: 7.0,
           longitudeDelta: 7.0,
         });
-        setStepError("Ciudad no incluida en demo. Usa Madrid, Barcelona o Valencia.");
+        setStepError("Ciudad no encontrada en el catálogo local. Prueba con otra búsqueda.");
       }
     }, 500);
 
@@ -363,6 +394,69 @@ export default function CreateTripScreen({ navigation, route }: Props) {
     setStops((prev) => prev.map((stop) => (stop.id === id ? { ...stop, price: value } : stop)));
   };
 
+  const parseHHmmToDate = (time?: string) => {
+    const now = new Date();
+    const normalized = (time || "").trim();
+    const match = normalized.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+    if (!match) return now;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    const parsed = new Date(now);
+    parsed.setHours(hours, minutes, 0, 0);
+    return parsed;
+  };
+
+  const formatDateToHHmm = (date: Date) => {
+    const h = String(date.getHours()).padStart(2, "0");
+    const m = String(date.getMinutes()).padStart(2, "0");
+    return `${h}:${m}`;
+  };
+
+  const openTimePicker = (target: TimePickerTarget, currentTime?: string) => {
+    if (!NativeDateTimePicker) {
+      setStepError("Falta la librería de selector de hora. Instala @react-native-community/datetimepicker.");
+      return;
+    }
+    setStepError(null);
+    setTimePickerTarget(target);
+    setPickerDate(parseHHmmToDate(currentTime));
+    setIsTimePickerOpen(true);
+  };
+
+  const closeTimePicker = () => {
+    setIsTimePickerOpen(false);
+    setTimePickerTarget(null);
+  };
+
+  const applyPickedTime = () => {
+    const value = formatDateToHHmm(pickerDate);
+    if (!timePickerTarget) return;
+    if (timePickerTarget.type === "manual") {
+      setStopTime(value);
+    } else {
+      setStops((prev) =>
+        prev.map((item) =>
+          item.id === timePickerTarget.stopId ? { ...item, time: value } : item
+        )
+      );
+    }
+    closeTimePicker();
+  };
+
+  const clearPickedTime = () => {
+    if (!timePickerTarget) return;
+    if (timePickerTarget.type === "manual") {
+      setStopTime("");
+    } else {
+      setStops((prev) =>
+        prev.map((item) =>
+          item.id === timePickerTarget.stopId ? { ...item, time: undefined } : item
+        )
+      );
+    }
+    closeTimePicker();
+  };
+
   const handleSubmit = async () => {
     if (isSubmitting) return;
 
@@ -382,6 +476,8 @@ export default function CreateTripScreen({ navigation, route }: Props) {
         title: stop.title,
         place_name: stop.title,
         address: stop.address,
+        start_time_text: stop.time?.trim() || null,
+        end_time_text: null,
         latitude: stop.latitude ?? null,
         longitude: stop.longitude ?? null,
         external_maps_url:
@@ -575,12 +671,30 @@ export default function CreateTripScreen({ navigation, route }: Props) {
                     <Text style={styles.inputLabel}>Presupuesto</Text>
                     <TextInput
                       style={styles.input}
-                      placeholder="420€ aprox."
+                      placeholder="420 €"
                       placeholderTextColor="#9CA3AF"
                       value={budget}
-                      onChangeText={setBudget}
+                      keyboardType="decimal-pad"
+                      onChangeText={(value) => setBudget(sanitizeMoneyInput(value))}
+                      onBlur={() => setBudget((prev) => formatEuroValue(prev))}
                     />
                   </View>
+                </View>
+                <View style={styles.chipRow}>
+                  {BUDGET_PRESETS.map((preset) => {
+                    const active = budget.trim() === preset;
+                    return (
+                      <Pressable
+                        key={preset}
+                        onPress={() => setBudget(preset)}
+                        style={[styles.chip, active && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                          {preset}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
 
@@ -679,22 +793,25 @@ export default function CreateTripScreen({ navigation, route }: Props) {
                 />
                 <View style={styles.inputRow}>
                   <View style={styles.inputCol}>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Hora"
-                      placeholderTextColor="#9CA3AF"
-                      value={stopTime}
-                      onChangeText={setStopTime}
-                    />
+                    <Text style={styles.inputLabel}>Hora de inicio</Text>
+                    <Pressable
+                      style={styles.timePickerButton}
+                      onPress={() => openTimePicker({ type: "manual" }, stopTime)}
+                    >
+                      <Text style={stopTime ? styles.timePickerValue : styles.timePickerPlaceholder}>
+                        {stopTime || "Sin hora"}
+                      </Text>
+                    </Pressable>
                   </View>
                   <View style={styles.inputCol}>
+                    <Text style={styles.inputLabel}>Precio</Text>
                     <TextInput
                       style={styles.input}
                       placeholder="Precio"
                       placeholderTextColor="#9CA3AF"
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
                       value={stopPrice}
-                      onChangeText={setStopPrice}
+                      onChangeText={(value) => setStopPrice(sanitizeMoneyInput(value))}
                     />
                   </View>
                 </View>
@@ -731,28 +848,31 @@ export default function CreateTripScreen({ navigation, route }: Props) {
 
                       <View style={styles.inputRow}>
                         <View style={styles.inputCol}>
-                          <TextInput
-                            style={styles.input}
-                            placeholder="Hora"
-                            placeholderTextColor="#9CA3AF"
-                            value={stop.time ?? ""}
-                            onChangeText={(value) =>
-                              setStops((prev) =>
-                                prev.map((item) =>
-                                  item.id === stop.id ? { ...item, time: value } : item
-                                )
-                              )
-                            }
-                          />
+                          <Text style={styles.inputLabel}>Hora de inicio</Text>
+                          <Pressable
+                            style={styles.timePickerButton}
+                            onPress={() => openTimePicker({ type: "stop", stopId: stop.id }, stop.time)}
+                          >
+                            <Text
+                              style={
+                                stop.time ? styles.timePickerValue : styles.timePickerPlaceholder
+                              }
+                            >
+                              {stop.time || "Sin hora"}
+                            </Text>
+                          </Pressable>
                         </View>
                         <View style={styles.inputCol}>
+                          <Text style={styles.inputLabel}>Precio</Text>
                           <TextInput
                             style={styles.input}
                             placeholder="Precio"
                             placeholderTextColor="#9CA3AF"
-                            keyboardType="numeric"
+                            keyboardType="decimal-pad"
                             value={stop.price ?? ""}
-                            onChangeText={(value) => updateStopPrice(stop.id, value)}
+                            onChangeText={(value) =>
+                              updateStopPrice(stop.id, sanitizeMoneyInput(value))
+                            }
                           />
                         </View>
                       </View>
@@ -786,7 +906,9 @@ export default function CreateTripScreen({ navigation, route }: Props) {
                 <View style={styles.reviewLine}>
                   <Text style={styles.reviewLabel}>Total paradas</Text>
                   <Text style={styles.reviewValue}>
-                    {totalStopsPrice > 0 ? `$${totalStopsPrice.toFixed(2)}` : "-"}
+                    {totalStopsPrice > 0
+                      ? `${totalStopsPrice.toFixed(2).replace(".", ",")} €`
+                      : "-"}
                   </Text>
                 </View>
                 <View style={styles.reviewLine}>
@@ -970,6 +1092,43 @@ export default function CreateTripScreen({ navigation, route }: Props) {
           ) : null}
         </View>
       </KeyboardAvoidingView>
+      <Modal
+        visible={isTimePickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={closeTimePicker}
+      >
+        <View style={styles.timePickerModalBackdrop}>
+          <Pressable style={styles.timePickerModalOverlay} onPress={closeTimePicker} />
+          <View style={styles.timePickerModalCard}>
+            <Text style={styles.timePickerModalTitle}>Seleccionar hora de inicio</Text>
+            {NativeDateTimePicker ? (
+              <NativeDateTimePicker
+                value={pickerDate}
+                mode="time"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                is24Hour
+                onChange={(_event: any, date?: Date) => {
+                  if (date) {
+                    setPickerDate(date);
+                  }
+                }}
+              />
+            ) : null}
+            <View style={styles.timePickerModalActions}>
+              <TouchableOpacity style={styles.timeClearButton} onPress={clearPickedTime}>
+                <Text style={styles.timeClearButtonText}>Quitar hora</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.timePickerSecondaryButton} onPress={closeTimePicker}>
+                <Text style={styles.timePickerSecondaryText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.timePickerPrimaryButton} onPress={applyPickedTime}>
+                <Text style={styles.timePickerPrimaryText}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

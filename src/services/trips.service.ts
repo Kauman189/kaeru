@@ -115,6 +115,8 @@ export type CreateStopPayload = {
   title: string;
   place_name?: string | null;
   address?: string | null;
+  start_time_text?: string | null;
+  end_time_text?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   external_maps_url?: string | null;
@@ -154,6 +156,8 @@ export async function addTripStops(tripId: string, stops: CreateStopPayload[]) {
   const payload = stops.map((stop) => ({
     ...stop,
     trip_id: tripId,
+    start_time_text: stop.start_time_text ?? null,
+    end_time_text: stop.end_time_text ?? null,
   }));
 
   const { data, error } = await supabase.from("trip_stops").insert(payload).select();
@@ -405,6 +409,8 @@ export async function replaceTripStops(tripId: string, stops: CreateStopPayload[
     title: stop.title,
     place_name: stop.place_name ?? null,
     address: stop.address ?? null,
+    start_time_text: stop.start_time_text ?? null,
+    end_time_text: stop.end_time_text ?? null,
     latitude: stop.latitude ?? null,
     longitude: stop.longitude ?? null,
     external_maps_url: stop.external_maps_url ?? null,

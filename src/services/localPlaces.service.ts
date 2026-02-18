@@ -9,14 +9,40 @@ const normalize = (value: string) =>
     .toLowerCase()
     .trim();
 
+const CITY_BY_KEY = new Map(DEMO_CITIES.map((city) => [city.key, city]));
+
+const CITY_SEARCH_INDEX = DEMO_CITIES.map((city) => ({
+  city,
+  normalizedLabel: normalize(city.label),
+  normalizedAliases: city.aliases.map((alias) => normalize(alias)),
+}));
+
+const PLACE_SEARCH_INDEX = DEMO_PLACES.map((place) => {
+  const city = CITY_BY_KEY.get(place.city);
+  const cityTokens = city
+    ? [normalize(city.label), ...city.aliases.map((alias) => normalize(alias))]
+    : [];
+
+  return {
+    place,
+    normalizedTitle: normalize(place.title),
+    normalizedAddress: normalize(place.address),
+    normalizedHaystack: normalize(
+      `${place.title} ${place.address} ${city?.label || ""} ${city?.aliases.join(" ") || ""}`
+    ),
+    cityTokens,
+  };
+});
+
 const resolveDestinationCity = (destination?: string) => {
   if (!destination?.trim()) return null;
   const query = normalize(destination);
   return (
-    DEMO_CITIES.find(
+    CITY_SEARCH_INDEX.find(
       (city) =>
-        query.includes(normalize(city.label)) || city.aliases.some((alias) => query.includes(normalize(alias)))
-    ) || null
+        query.includes(city.normalizedLabel) ||
+        city.normalizedAliases.some((alias) => query.includes(alias))
+    )?.city || null
   );
 };
 
@@ -27,17 +53,16 @@ export function searchLocalPlaces(query: string, destination?: string): LocalPla
 
   const destinationCity = resolveDestinationCity(destination);
 
-  const ranked = DEMO_PLACES.map((place) => {
-    const haystack = `${place.title} ${place.address} ${place.city}`;
-    const normalizedHaystack = normalize(haystack);
-    const titleScore = normalize(place.title).includes(normalizedQuery) ? 2 : 0;
-    const addressScore = normalize(place.address).includes(normalizedQuery) ? 1 : 0;
-    const cityScore = destinationCity && place.city === destinationCity.key ? 3 : 0;
-    const match = normalizedHaystack.includes(normalizedQuery);
+  const ranked = PLACE_SEARCH_INDEX.map((item) => {
+    const titleScore = item.normalizedTitle.includes(normalizedQuery) ? 3 : 0;
+    const addressScore = item.normalizedAddress.includes(normalizedQuery) ? 2 : 0;
+    const cityTokenScore = item.cityTokens.some((token) => token.includes(normalizedQuery)) ? 1 : 0;
+    const cityScore = destinationCity && item.place.city === destinationCity.key ? 4 : 0;
+    const match = item.normalizedHaystack.includes(normalizedQuery);
     return {
-      place,
+      place: item.place,
       match,
-      score: titleScore + addressScore + cityScore,
+      score: titleScore + addressScore + cityTokenScore + cityScore,
     };
   })
     .filter((row) => row.match)
@@ -56,11 +81,11 @@ export function resolveLocalCityCenter(query: string): { label: string; latitude
   const normalizedQuery = normalize(query);
   if (!normalizedQuery) return null;
 
-  const city = DEMO_CITIES.find(
+  const city = CITY_SEARCH_INDEX.find(
     (item) =>
-      normalizedQuery.includes(normalize(item.label)) ||
-      item.aliases.some((alias) => normalizedQuery.includes(normalize(alias)))
-  );
+      normalizedQuery.includes(item.normalizedLabel) ||
+      item.normalizedAliases.some((alias) => normalizedQuery.includes(alias))
+  )?.city;
 
   if (!city) return null;
 
