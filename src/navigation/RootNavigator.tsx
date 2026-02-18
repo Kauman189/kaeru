@@ -1,11 +1,11 @@
-/**
- * Navegador principal y control de onboarding.
- */
-import React, { useEffect, useState } from "react";
-import { NavigationContainer } from "@react-navigation/native";
+
+ // Navegador principal y control de onboarding.
+ 
+import React, { useEffect, useRef, useState } from "react";
+import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
 import type { LinkingOptions } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Text, View } from "react-native";
+import { Linking, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import OnboardingScreen from "../screens/OnboardingScreen";
 import TabsPager from "../screens/TabsPager";
@@ -51,8 +51,16 @@ export type RootStackParamList = {
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
+function extractInviteToken(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const match = url.match(/\/invite\/([^/?#]+)/i);
+  return match?.[1] ?? null;
+}
+
 const linking: LinkingOptions<RootStackParamList> = {
-  prefixes: ["kaeru://"],
+  prefixes: ["kaeru://", "exp://", "exps://"],
   config: {
     screens: {
       InviteResolver: "invite/:token",
@@ -64,6 +72,7 @@ const linking: LinkingOptions<RootStackParamList> = {
 export default function RootNavigator() {
   const [isReady, setIsReady] = useState(false);
   const [initialRouteName, setInitialRouteName] = useState<keyof RootStackParamList>("Onboarding");
+  const lastHandledInviteRef = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -82,6 +91,27 @@ export default function RootNavigator() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isReady) return;
+
+    const handleIncomingUrl = (url: string | null | undefined) => {
+      const token = extractInviteToken(url);
+      if (!token) return;
+      if (lastHandledInviteRef.current === token) return;
+      if (!navigationRef.isReady()) return;
+
+      lastHandledInviteRef.current = token;
+      navigationRef.navigate("InviteResolver", { token });
+    };
+
+    Linking.getInitialURL().then((url) => handleIncomingUrl(url));
+    const sub = Linking.addEventListener("url", ({ url }) => handleIncomingUrl(url));
+
+    return () => {
+      sub.remove();
+    };
+  }, [isReady]);
+
   if (!isReady) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -93,7 +123,7 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer linking={linking}>
+    <NavigationContainer linking={linking} ref={navigationRef}>
       <Stack.Navigator
         screenOptions={{ headerShown: false }}
         initialRouteName={initialRouteName}

@@ -136,7 +136,7 @@ export type UpdateTripPayload = Partial<
 >;
 
 export async function createTrip(payload: CreateTripPayload) {
-  // Yo centralizo la creación de viaje aquí para que CreateTripScreen no tenga SQL disperso.
+  // Se centraliza la creación de viaje aquí
   const { data, error } = await supabase
     .from("trips")
     .insert(payload)
@@ -184,14 +184,21 @@ export async function inviteCollaborator(tripId: string, userId: string) {
 }
 
 export async function removeCollaborator(tripId: string, userId: string) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("trip_collaborators")
     .delete()
     .eq("trip_id", tripId)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .select("id");
 
   if (error) {
     throw error;
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error(
+      "No se pudo abandonar el viaje (sin permisos RLS o fila no encontrada)."
+    );
   }
 
   return true;
@@ -227,7 +234,7 @@ export async function getPublicTrips() {
 }
 
 export async function getTripsByOwner(ownerId: string) {
-  // Yo separo viajes propios para que MyTrips tenga un origen de datos claro.
+  // Se separan viajes propios para que MyTrips tenga un origen de datos claro.
   const { data, error } = await supabase
     .from("trips")
     .select("*")
@@ -242,7 +249,7 @@ export async function getTripsByOwner(ownerId: string) {
 }
 
 export async function getTripsSharedWithUser(userId: string) {
-  // Yo resuelvo aquí la pestaña "Compartidos", incluyendo rol colaborativo.
+  // Arreglar la pestaña "Compartidos", incluyendo rol colaborativo.
   const { data, error } = await supabase
     .from("trip_collaborators")
     .select("role,status,trips(*)")
@@ -364,18 +371,22 @@ export async function updateTripVisibility(tripId: string, visibility: TripVisib
 }
 
 export async function updateTrip(tripId: string, payload: UpdateTripPayload) {
-  const { data, error } = await supabase
-    .from("trips")
-    .update(payload)
-    .eq("id", tripId)
-    .select("*")
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from("trips")
+      .update(payload)
+      .eq("id", tripId)
+      .select("*")
+      .single();
 
-  if (error) {
-    throw error;
+    if (error) {
+      throw error;
+    }
+
+    return data as TripRecord;
+  } catch (error: any) {
+    throw new Error(`[trip:update] ${error?.message || "No se pudo actualizar el viaje."}`);
   }
-
-  return data as TripRecord;
 }
 
 export async function replaceTripStops(tripId: string, stops: CreateStopPayload[]) {
@@ -482,7 +493,6 @@ export async function removeTripMediaRecord(mediaId: string) {
 }
 
 export async function getTripPdfs(tripId: string) {
-  // Yo fuerzo que los PDFs salgan por trip_id para que TripDetail y Viaje activo compartan la misma fuente.
   const { data, error } = await supabase
     .from("media")
     .select("id,owner_id,trip_id,stop_id,kind,url,file_name,mime_type,file_size_bytes,created_at")
@@ -506,7 +516,7 @@ export async function addTripPdfRecord(payload: {
   file_size_bytes: number;
 }) {
   try {
-    // Yo guardo el path interno de Storage (no URL pública) para poder firmar descargas de forma segura.
+    
     return await addTripMediaRecord({
       owner_id: payload.owner_id,
       trip_id: payload.trip_id,
@@ -530,7 +540,6 @@ export async function removeTripPdfRecord(mediaId: string) {
 }
 
 export async function getSignedTripPdfUrl(storagePath: string, expiresIn = 120) {
-  // Yo genero URL firmada corta para descarga segura sin exponer bucket privado.
   const { data, error } = await supabase.storage
     .from("trip-documents")
     .createSignedUrl(storagePath, expiresIn);
@@ -682,35 +691,93 @@ export async function createTripInviteLink(
   tripId: string,
   role: "viewer" | "editor" = "editor"
 ) {
-  const { data, error } = await supabase.rpc("create_trip_invite", {
-    p_trip_id: tripId,
-    p_role: role,
-    p_expires_in_hours: 168,
-    p_max_uses: 50,
-  });
+  const rpcPayloads = [
+    {
+      p_trip_id: tripId,
+      p_role: role,
+      p_expires_in_hours: 168,
+      p_max_uses: 50,
+    },
+    {
+      trip_id: tripId,
+      role,
+      expires_in_hours: 168,
+      max_uses: 50,
+    },
+    {
+      p_trip_id: tripId,
+      p_role: role,
+    },
+    {
+      trip_id: tripId,
+      role,
+    },
+  ] as const;
 
-  if (error) {
-    throw error;
+  let lastError: any = null;
+  let data: any = null;
+
+  for (const payload of rpcPayloads) {
+    const response = await supabase.rpc("create_trip_invite", payload as any);
+    if (!response.error) {
+      data = response.data;
+      lastError = null;
+      break;
+    }
+    lastError = response.error;
+  }
+
+  if (lastError) {
+    throw new Error(`[invite:create] ${lastError.message}`);
   }
 
   const row = Array.isArray(data) ? data[0] : data;
-  if (!row?.invite_token) {
-    throw new Error("No se pudo generar el enlace de invitación.");
+  const inviteToken = row?.invite_token || row?.inviteToken || null;
+  if (!inviteToken) {
+    throw new Error("[invite:create] No se pudo generar el enlace de invitación.");
   }
 
-  return row as CreatedInvite;
+  return {
+    invite_token: inviteToken,
+    expires_at: row?.expires_at ?? row?.expiresAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    role: (row?.role ?? role) as "viewer" | "editor",
+    trip_id: row?.trip_id ?? row?.tripId ?? tripId,
+  } as CreatedInvite;
 }
 
 export async function acceptTripInviteToken(token: string) {
-  const { data, error } = await supabase.functions.invoke("accept-trip-invite", {
-    body: { token },
-  });
+  const rpcPayloads = [{ p_token: token }, { token }] as const;
+  let lastError: any = null;
+  let data: any = null;
 
-  if (error) {
-    throw error;
+  for (const payload of rpcPayloads) {
+    const response = await supabase.rpc("consume_trip_invite", payload as any);
+    if (!response.error) {
+      data = response.data;
+      lastError = null;
+      break;
+    }
+    lastError = response.error;
   }
 
-  return data as ConsumedInvite;
+  if (lastError) {
+    throw new Error(`[invite:consume] ${lastError.message}`);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  const tripId = row?.trip_id ?? row?.tripId ?? null;
+  const role = row?.role ?? "viewer";
+  const status = row?.status ?? "accepted";
+
+  if (!tripId) {
+    throw new Error("[invite:consume] La respuesta de la invitación no incluye trip_id.");
+  }
+
+  return {
+    trip_id: tripId,
+    role,
+    status,
+  } as ConsumedInvite;
 }
 
 export async function deleteTripCompletely(tripId: string, ownerId: string) {

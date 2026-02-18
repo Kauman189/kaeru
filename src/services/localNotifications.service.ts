@@ -89,7 +89,7 @@ export async function scheduleSessionNotifications(
     daily_summary: true,
   }
 ) {
-  // Yo programo aquí todas las notificaciones locales del viaje activo para que la pantalla solo dispare este flujo.
+  // se asume que el usuario ya dio permisos, se puede mejorar pidiendo permiso aquí si no los tiene.
   const { data } = await supabase.auth.getUser();
   const userId = data.user?.id;
   if (!userId) {

@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
+import * as Clipboard from "expo-clipboard";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ArrowDown, ArrowLeft, ArrowUp, Download, FileText, Plus, Trash2 } from "lucide-react-native";
@@ -433,13 +434,15 @@ export default function ActiveTripDetailScreen({ navigation, route }: Props) {
     try {
       const invite = await createTripInviteLink(session.trip_id, "editor");
       const url = `kaeru://invite/${invite.invite_token}`;
+      await Clipboard.setStringAsync(url);
       await Share.share({
         message: `Únete a este viaje en Kaeru:\n${url}`,
         url,
       });
       await track("play_invite_link_created", { session_id: session.id, trip_id: session.trip_id });
     } catch (err: any) {
-      setError(err?.message || "No se pudo generar el enlace de invitación.");
+      const message = String(err?.message || err || "").replace("[invite:create] ", "").trim();
+      setError(message || "No se pudo generar el enlace de invitación.");
     } finally {
       setIsInviting(false);
     }

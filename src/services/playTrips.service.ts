@@ -102,9 +102,8 @@ export type StartPlayTripParams = {
   summaryTimeLocal?: string;
   includeCollaborators?: boolean;
 };
-
+// reivsar que no se salte la validacion de fechas en el inicio de play trip 
 export async function startPlayTrip(params: StartPlayTripParams) {
-  // Yo uso este RPC para arrancar una sesión viva del viaje con permisos ya validados en backend.
   const { data, error } = await supabase.rpc("start_trip_play", {
     p_trip_id: params.tripId,
     p_mode: params.mode,
@@ -124,7 +123,6 @@ export async function startPlayTrip(params: StartPlayTripParams) {
 }
 
 export async function getMyActivePlaySessions() {
-  // Yo consolido sesiones activas del usuario y enriquezco con título/destino para la lista.
   const { data, error } = await supabase.rpc("get_my_active_play_sessions");
   if (error) throw error;
 
@@ -147,7 +145,6 @@ export async function getMyActivePlaySessions() {
 }
 
 export async function getPlaySessionWithStops(sessionId: string) {
-  // Yo cargo sesión + paradas + participantes en una sola llamada para render estable de ActiveTripDetail.
   const { data: userData } = await supabase.auth.getUser();
   const currentUserId = userData.user?.id ?? null;
   const [{ data: sessionData, error: sessionError }, { data: stopsData, error: stopsError }, { data: participantsData, error: participantsError }] =
@@ -382,7 +379,6 @@ export async function replacePlayNotificationJobsForUser(
 }
 
 export async function updatePlaySummaryLive(sessionId: string, summary: PlaySummaryLive) {
-  // Yo mantengo resumen/checklist como copia local de sesión, sin pisar details del viaje base.
   const { data, error } = await supabase.rpc("update_play_summary_live", {
     p_session_id: sessionId,
     p_summary: summary,

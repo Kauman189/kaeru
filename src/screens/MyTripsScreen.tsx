@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Mic, Play, Plus, SlidersHorizontal, Share2 } from "lucide-react-native";
 import styles from "./MyTripsScreen.styles";
@@ -72,6 +73,8 @@ export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScree
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [generatedInviteUrl, setGeneratedInviteUrl] = useState<string | null>(null);
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteStatus, setInviteStatus] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [cacheNotice, setCacheNotice] = useState<string | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -207,6 +210,8 @@ export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScree
 
   useEffect(() => {
     setGeneratedInviteUrl(null);
+    setInviteError(null);
+    setInviteStatus(null);
   }, [selectedTripId]);
 
   useEffect(() => {
@@ -302,15 +307,21 @@ export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScree
     if (!selectedTripId) return;
     const trip = ownedTrips.find((item) => item.id === selectedTripId);
     setIsGeneratingInvite(true);
+    setInviteError(null);
+    setInviteStatus(null);
     try {
       const invite = await createTripInviteLink(selectedTripId, "editor");
       const url = `kaeru://invite/${invite.invite_token}`;
       const message = `Te invito a este viaje: "${trip?.title || "Viaje en Kaeru"}"\n${url}`;
       setGeneratedInviteUrl(url);
+      await Clipboard.setStringAsync(url);
+      setInviteStatus("Enlace copiado al portapapeles.");
       await track("trip_share_link_created", { trip_id: selectedTripId });
       await Share.share({ message, url });
-    } catch {
-      // ignore
+    } catch (err: any) {
+      const rawMessage = String(err?.message || err || "");
+      const cleaned = rawMessage.replace("[invite:create] ", "").trim();
+      setInviteError(cleaned || "No se pudo compartir el enlace.");
     } finally {
       setIsGeneratingInvite(false);
     }
@@ -517,6 +528,10 @@ export default function MyTripsScreen({ onTabBarVisibilityChange }: MyTripsScree
                 <Text style={styles.inviteEmptyText}>
                   {isGeneratingInvite ? "Generando enlace seguro..." : shareUrl || "Pulsa \"Compartir enlace\""}
                 </Text>
+                {inviteStatus ? <Text style={styles.inviteEmptyText}>{inviteStatus}</Text> : null}
+                {inviteError ? (
+                  <Text style={[styles.inviteEmptyText, { color: "#B91C1C" }]}>{inviteError}</Text>
+                ) : null}
               </View>
             ) : null}
 

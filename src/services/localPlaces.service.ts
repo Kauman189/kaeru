@@ -21,7 +21,7 @@ const resolveDestinationCity = (destination?: string) => {
 };
 
 export function searchLocalPlaces(query: string, destination?: string): LocalPlace[] {
-  // Yo dejo esta búsqueda local para demo estable; si en el futuro meto Google Places, este es el punto de reemplazo.
+  // Se deja esta búsqueda local para demo estable; si en el futuro meto Google Places API, esta funcion es la se debe editar. 
   const normalizedQuery = normalize(query);
   if (normalizedQuery.length < 2) return [];
 
@@ -51,9 +51,8 @@ export function searchLocalPlaces(query: string, destination?: string): LocalPla
 export function getLocalPlaceById(id: string): LocalPlace | null {
   return DEMO_PLACES.find((place) => place.id === id) || null;
 }
-
+// esta funcion centra el mapa en la ciudad del destino si el usuario no selecciona un lugar específico, en caso de usar google maps refactorizar para que devuelva coordenadas de la ciudad en lugar de un lugar específico.
 export function resolveLocalCityCenter(query: string): { label: string; latitude: number; longitude: number } | null {
-  // Yo centralizo el centrado del mapa aquí para evitar hardcodes de ciudad en pantallas.
   const normalizedQuery = normalize(query);
   if (!normalizedQuery) return null;
 

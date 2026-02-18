@@ -19,6 +19,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
 import { useProfile } from "../store/profileContext";
 import { supabase } from "../lib/supabase";
+import { normalizeImageForUpload } from "../utils/mediaUpload";
 import styles from "./ProfileEditScreen.styles";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ProfileEdit">;
@@ -270,17 +271,14 @@ export default function ProfileEditScreen({ navigation }: Props) {
     setIsUploadingImage(true);
     try {
       const asset = result.assets[0];
-      const extRaw =
-        asset.fileName?.split(".").pop()?.toLowerCase() ||
-        asset.mimeType?.split("/").pop()?.toLowerCase() ||
-        "jpg";
-      const extension = extRaw.replace(/[^a-z0-9]/g, "") || "jpg";
+      const normalizedImage = await normalizeImageForUpload(asset, { quality: 0.85 });
+      const extension = normalizedImage.extension;
       const path = `${userData.user.id}/profile/${type}-${Date.now()}.${extension}`;
 
-      const response = await fetch(asset.uri);
+      const response = await fetch(normalizedImage.uri);
       const bytes = await response.arrayBuffer();
       const { error: uploadError } = await supabase.storage.from("trip-media").upload(path, bytes, {
-        contentType: asset.mimeType || "image/jpeg",
+        contentType: normalizedImage.mimeType,
         upsert: true,
       });
       if (uploadError) {

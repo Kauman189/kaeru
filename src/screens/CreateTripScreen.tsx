@@ -88,6 +88,7 @@ export default function CreateTripScreen({ navigation, route }: Props) {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(isEditMode);
+  const [isTripOwnerForVisibility, setIsTripOwnerForVisibility] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stepError, setStepError] = useState<string | null>(null);
   const [mapRegion, setMapRegion] = useState<Region>(INITIAL_REGION);
@@ -136,7 +137,8 @@ export default function CreateTripScreen({ navigation, route }: Props) {
       setIsBootstrapping(true);
       setError(null);
       try {
-        const [trip, stopRows, tagNames] = await Promise.all([
+        const [{ data: userData }, trip, stopRows, tagNames] = await Promise.all([
+          supabase.auth.getUser(),
           getTripById(editingTripId),
           getTripStops(editingTripId),
           getTripTags(editingTripId),
@@ -148,6 +150,7 @@ export default function CreateTripScreen({ navigation, route }: Props) {
         setDestination(trip.destination || "");
         setBudget(trip.estimated_budget_text || "");
         setVisibility(trip.visibility || "public");
+        setIsTripOwnerForVisibility(Boolean(userData.user?.id && userData.user.id === trip.owner_id));
         setSelectedTags(tagNames);
         const details = (trip.details || {}) as TripDetails;
         setHighlights(details.highlights || "");
@@ -410,9 +413,11 @@ export default function CreateTripScreen({ navigation, route }: Props) {
           start_date: null,
           end_date: null,
           estimated_budget_text: budget || null,
-          visibility,
           details: tripDetails,
         };
+        if (isTripOwnerForVisibility) {
+          updatePayload.visibility = visibility;
+        }
         await updateTrip(editingTripId, updatePayload);
 
         await replaceTripStops(editingTripId, normalizedStops);
@@ -457,7 +462,14 @@ export default function CreateTripScreen({ navigation, route }: Props) {
 
       navigation.goBack();
     } catch (err: any) {
-      setError(err?.message || "No se pudo guardar el viaje.");
+      const raw = String(err?.message || err || "").toLowerCase();
+      if (raw.includes("cannot coerce") || raw.includes("single json object")) {
+        setError("No tienes permisos para cambiar la visibilidad de este viaje compartido.");
+      } else if (raw.includes("[trip:update]")) {
+        setError("No se pudieron guardar los cambios del viaje.");
+      } else {
+        setError(err?.message || "No se pudo guardar el viaje.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -867,8 +879,10 @@ export default function CreateTripScreen({ navigation, route }: Props) {
                     style={[
                       styles.visibilityOption,
                       visibility === "public" && styles.visibilityOptionActive,
+                      !isTripOwnerForVisibility && { opacity: 0.55 },
                     ]}
                     onPress={() => setVisibility("public")}
+                    disabled={!isTripOwnerForVisibility}
                   >
                     <Text
                       style={[
@@ -885,8 +899,10 @@ export default function CreateTripScreen({ navigation, route }: Props) {
                     style={[
                       styles.visibilityOption,
                       visibility === "private" && styles.visibilityOptionActive,
+                      !isTripOwnerForVisibility && { opacity: 0.55 },
                     ]}
                     onPress={() => setVisibility("private")}
+                    disabled={!isTripOwnerForVisibility}
                   >
                     <Text
                       style={[
@@ -899,6 +915,11 @@ export default function CreateTripScreen({ navigation, route }: Props) {
                     <Text style={styles.visibilitySubtext}>Solo tu y colaboradores</Text>
                   </Pressable>
                 </View>
+                {!isTripOwnerForVisibility ? (
+                  <Text style={[styles.helperText, { marginTop: 8 }]}>
+                    Solo el propietario puede cambiar la visibilidad del viaje.
+                  </Text>
+                ) : null}
               </View>
 
               {error ? <Text style={styles.errorText}>{error}</Text> : null}

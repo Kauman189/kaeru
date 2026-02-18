@@ -1,7 +1,5 @@
-/**
- * Pantalla de acceso tras el CTA principal del onboarding.
- * UI de MVP preparada para integracion con backend.
- */
+// Pantalla de acceso tras el CTA principal del onboarding.
+
 import React, { useState } from "react";
 import {
   Keyboard,

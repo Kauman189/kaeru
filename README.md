@@ -263,7 +263,7 @@ Rango: **11/11/2025 -> 18/02/2026**
 - Configuración personal de notificaciones por participante.
 - Corrección de permisos owner/editor/viewer en acciones live.
 
-### Semana 14 (10/02 - 16/02)
+### Semana 14 (10/02 - 16/02)5
 
 - Hardening de PDF: permisos consistentes DB + storage.
 - Alineación de carga de documentos entre TripDetail y ActiveTrip.

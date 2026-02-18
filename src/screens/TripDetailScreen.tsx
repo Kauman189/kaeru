@@ -39,6 +39,7 @@ import { Trash2 } from "lucide-react-native";
 import MapView, { Marker, PROVIDER_DEFAULT, Region } from "react-native-maps";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import * as Clipboard from "expo-clipboard";
 import styles from "./TripDetailScreen.styles";
 import { supabase } from "../lib/supabase";
 import {
@@ -67,10 +68,12 @@ import {
   updateTripCoverImage,
   updateTripVisibility,
   removeTripMediaRecord,
+  removeCollaborator,
 } from "../services/trips.service";
 import { getProfilesByIds, ProfileRecord } from "../services/profiles.service";
 import { resolveLocalCityCenter } from "../services/localPlaces.service";
 import { formatStopTimeRange } from "../utils/timeFormat";
+import { normalizeImageForUpload } from "../utils/mediaUpload";
 import {
   canComment,
   canDeleteMedia,
@@ -98,7 +101,6 @@ type Props = NativeStackScreenProps<RootStackParamList, "TripDetail">;
 type CollaboratorRecord = { user_id: string; role: string; status: string };
 type TripCommentView = TripCommentRecord & { authorLabel: string; mine: boolean };
 
-const AVATAR_COLORS = ["#FDE68A", "#93C5FD", "#FCA5A5", "#86EFAC", "#C4B5FD"];
 const COMMENT_MAX_LENGTH = 500;
 const MAX_PDF_SIZE_BYTES = 15 * 1024 * 1024;
 
@@ -121,6 +123,7 @@ export default function TripDetailScreen({ navigation, route }: Props) {
   const [isSavingVisibility, setIsSavingVisibility] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [isDeletingTrip, setIsDeletingTrip] = useState(false);
+  const [isLeavingSharedTrip, setIsLeavingSharedTrip] = useState(false);
   const [isTripSettingsOpen, setIsTripSettingsOpen] = useState(false);
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
   const [isDownloadingPdfId, setIsDownloadingPdfId] = useState<string | null>(null);
@@ -336,6 +339,14 @@ export default function TripDetailScreen({ navigation, route }: Props) {
   const canUploadMediaAction = Boolean(trip && allowUploadMedia);
   const canDeleteMediaAction = Boolean(trip && allowDeleteMedia);
   const canUploadPdfAction = Boolean(trip && allowUploadPdf);
+  const canLeaveSharedTrip = Boolean(
+    source === "my_shared" &&
+      tripId &&
+      currentUserId &&
+      isAcceptedCollaborator &&
+      !isOwner
+  );
+  const canShowTripSettings = Boolean(allowDeleteTrip || canLeaveSharedTrip);
 
   const tripVisibility = trip?.visibility ?? "public";
 
@@ -383,20 +394,17 @@ export default function TripDetailScreen({ navigation, route }: Props) {
     try {
       for (let index = 0; index < result.assets.length; index += 1) {
         const asset = result.assets[index];
-        const extensionRaw =
-          asset.fileName?.split(".").pop()?.toLowerCase() ||
-          asset.mimeType?.split("/").pop()?.toLowerCase() ||
-          "jpg";
-        const extension = extensionRaw.replace(/[^a-z0-9]/g, "") || "jpg";
+        const normalizedImage = await normalizeImageForUpload(asset, { quality: 0.85 });
+        const extension = normalizedImage.extension;
         const filePath = `${currentUserId}/${tripId}/${Date.now()}-${index}.${extension}`;
 
-        const response = await fetch(asset.uri);
+        const response = await fetch(normalizedImage.uri);
         const buffer = await response.arrayBuffer();
 
         const { error: uploadError } = await supabase.storage
           .from("trip-media")
           .upload(filePath, buffer, {
-            contentType: asset.mimeType || "image/jpeg",
+            contentType: normalizedImage.mimeType,
             upsert: false,
           });
 
@@ -518,6 +526,36 @@ export default function TripDetailScreen({ navigation, route }: Props) {
 
   const closeTripSettings = () => {
     setIsTripSettingsOpen(false);
+  };
+
+  const handleLeaveSharedTrip = () => {
+    if (!tripId || !currentUserId || !canLeaveSharedTrip || isLeavingSharedTrip) return;
+    Alert.alert(
+      "Abandonar viaje compartido",
+      "Dejarás de ver este viaje en Compartidos. ¿Quieres continuar?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Abandonar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsLeavingSharedTrip(true);
+              setError(null);
+              await removeCollaborator(tripId, currentUserId);
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Tabs", params: { targetTab: "my_trips" } }],
+              });
+            } catch (err: any) {
+              setError(err?.message || "No se pudo abandonar el viaje compartido.");
+            } finally {
+              setIsLeavingSharedTrip(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleAddPdf = async () => {
@@ -766,6 +804,7 @@ export default function TripDetailScreen({ navigation, route }: Props) {
     try {
       const deepLink = `kaeru://trip/${tripId}`;
       const webLink = `https://kaeru.app/trips/${tripId}`;
+      await Clipboard.setStringAsync(deepLink);
       await Share.share({
         message: `${tripTitle}\n${webLink}\n${deepLink}`,
       });
@@ -797,13 +836,15 @@ export default function TripDetailScreen({ navigation, route }: Props) {
     try {
       const invite = await createTripInviteLink(tripId, "editor");
       const url = `kaeru://invite/${invite.invite_token}`;
+      await Clipboard.setStringAsync(url);
       await Share.share({
         message: `Únete al viaje en Kaeru:\n${url}`,
         url,
       });
       await track("play_invite_link_created", { trip_id: tripId, session_id: activePlaySession?.id });
     } catch (err: any) {
-      setError(err?.message || "No se pudo crear el enlace de invitación.");
+      const message = String(err?.message || err || "").replace("[invite:create] ", "").trim();
+      setError(message || "No se pudo crear el enlace de invitación.");
     } finally {
       setIsCreatingPlayInvite(false);
     }
@@ -878,25 +919,6 @@ export default function TripDetailScreen({ navigation, route }: Props) {
       setIsSubmittingComment(false);
     }
   };
-
-  const collaboratorUsers = collaboratorProfiles.map((profile, index) => {
-    const name = (profile.full_name || profile.username || "Usuario").trim() || "Usuario";
-    const initials = name
-      .split(" ")
-      .slice(0, 2)
-      .map((chunk) => chunk[0])
-      .join("")
-      .toUpperCase();
-
-    return {
-      id: profile.id,
-      initials,
-      avatarColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
-    };
-  });
-
-  const visibleCollaborators = collaboratorUsers.slice(0, 3);
-  const extraCollaborators = collaboratorUsers.length - visibleCollaborators.length;
 
   const tripTitle = trip?.title ?? "Viaje";
   const tripBudget = trip?.estimated_budget_text ?? "-";
@@ -1062,9 +1084,12 @@ export default function TripDetailScreen({ navigation, route }: Props) {
             </Pressable>
           )}
 
-          {allowDeleteTrip && (
+          {canShowTripSettings && (
             <Pressable
-              style={styles.tripSettingsButton}
+              style={[
+                styles.tripSettingsButton,
+                canDeleteMediaAction && styles.tripSettingsButtonWithDelete,
+              ]}
               onPress={() => setIsTripSettingsOpen(true)}
               accessibilityRole="button"
             >
@@ -1076,33 +1101,6 @@ export default function TripDetailScreen({ navigation, route }: Props) {
             <View style={styles.uploadingOverlay}>
               <ActivityIndicator size="small" color="#FFFFFF" />
               <Text style={styles.uploadingText}>Subiendo imágenes...</Text>
-            </View>
-          )}
-
-          {visibleCollaborators.length > 0 && (
-            <View
-              style={[
-                styles.avatarsContainer,
-                (canDeleteMediaAction || allowDeleteTrip) && styles.avatarsContainerWithActions,
-              ]}
-            >
-              {visibleCollaborators.map((user, index) => (
-                <View
-                  key={user.id}
-                  style={[
-                    styles.avatar,
-                    { backgroundColor: user.avatarColor },
-                    index > 0 && styles.avatarStacked,
-                  ]}
-                >
-                  <Text style={styles.avatarText}>{user.initials}</Text>
-                </View>
-              ))}
-              {extraCollaborators > 0 && (
-                <View style={[styles.avatar, styles.avatarStacked]}>
-                  <Text style={styles.avatarText}>+{extraCollaborators}</Text>
-                </View>
-              )}
             </View>
           )}
 
@@ -1464,19 +1462,46 @@ export default function TripDetailScreen({ navigation, route }: Props) {
           <Pressable style={styles.tripSettingsOverlayTap} onPress={closeTripSettings} />
           <View style={styles.tripSettingsSheet}>
             <Text style={styles.tripSettingsTitle}>Ajustes del viaje</Text>
-            <Pressable
-              style={[styles.tripSettingsDangerButton, isDeletingTrip && styles.tripSettingsDangerButtonDisabled]}
-              onPress={() => {
-                closeTripSettings();
-                handleDeleteTrip();
-              }}
-              disabled={isDeletingTrip}
-            >
-              <Trash2 size={16} color="#FFFFFF" />
-              <Text style={styles.tripSettingsDangerText}>
-                {isDeletingTrip ? "Eliminando..." : "Eliminar viaje"}
+            {allowDeleteTrip ? (
+              <Pressable
+                style={[
+                  styles.tripSettingsDangerButton,
+                  isDeletingTrip && styles.tripSettingsDangerButtonDisabled,
+                ]}
+                onPress={() => {
+                  closeTripSettings();
+                  handleDeleteTrip();
+                }}
+                disabled={isDeletingTrip}
+              >
+                <Trash2 size={16} color="#FFFFFF" />
+                <Text style={styles.tripSettingsDangerText}>
+                  {isDeletingTrip ? "Eliminando..." : "Eliminar viaje"}
+                </Text>
+              </Pressable>
+            ) : null}
+            {canLeaveSharedTrip ? (
+              <Pressable
+                style={[
+                  styles.tripSettingsLeaveButton,
+                  isLeavingSharedTrip && styles.tripSettingsDangerButtonDisabled,
+                ]}
+                onPress={() => {
+                  closeTripSettings();
+                  handleLeaveSharedTrip();
+                }}
+                disabled={isLeavingSharedTrip}
+              >
+                <Text style={styles.tripSettingsLeaveText}>
+                  {isLeavingSharedTrip ? "Abandonando..." : "Abandonar viaje compartido"}
+                </Text>
+              </Pressable>
+            ) : null}
+            {!allowDeleteTrip && !canLeaveSharedTrip ? (
+              <Text style={styles.tripSettingsInfoText}>
+                No hay acciones de edición disponibles para este viaje.
               </Text>
-            </Pressable>
+            ) : null}
             <Pressable style={styles.tripSettingsCancelButton} onPress={closeTripSettings}>
               <Text style={styles.tripSettingsCancelText}>Cancelar</Text>
             </Pressable>

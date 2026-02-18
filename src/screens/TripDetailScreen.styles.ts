@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   tripSettingsButton: {
     position: "absolute",
     top: 12,
-    right: 52,
+    right: 16,
     width: 30,
     height: 30,
     alignItems: "center",
@@ -99,6 +99,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(30,30,30,0.9)",
     borderRadius: 15,
     zIndex: 2,
+  },
+  tripSettingsButtonWithDelete: {
+    right: 52,
   },
   addMediaText: {
     color: "#FFFFFF",
@@ -618,6 +621,24 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "700",
+  },
+  tripSettingsLeaveButton: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tripSettingsLeaveText: {
+    color: "#B91C1C",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  tripSettingsInfoText: {
+    color: "#6B7280",
+    fontSize: 13,
   },
   tripSettingsCancelButton: {
     borderRadius: 12,
